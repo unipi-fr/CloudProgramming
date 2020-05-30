@@ -1,10 +1,12 @@
 package it.unipi.hadoop;
 
 import java.io.IOException;
+import java.util.ArrayList;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
@@ -20,11 +22,11 @@ import org.apache.hadoop.util.GenericOptionsParser;
 public class KMeans {
 
     // Sottoclasse che implemeta il codice e le variabili del mapper
-    public static class KMeansMapper extends Mapper<LongWritable, Text, Text, Text> {
+    public static class KMeansMapper extends Mapper<LongWritable, Text, IntWritable, PointWritable> {
 
         // IMPORTANTE: usare delle variabili "final" per passare la chiave e il valore al context!
-        private final Text outputKey = new Text();
-        private final Text outputValue = new Text();
+        private final IntWritable outputKey = new IntWritable();
+        private final PointWritable outputValue = new PointWritable();
 
         // codice del mapper
         @Override
@@ -35,17 +37,53 @@ public class KMeans {
             // key = indice della riga del file
             // value = riga del file
             // Preleva la struttura che contiene la configurazione
+            ArrayList<PointWritable> centroids = null; //TODO: leggere da conf (Centri cluster)
+            int k = 0; //TODO: leggere da conf (Numero di cluster)
+            int d = 0; //TODO: leggere da conf (Dimensione punti)
             Configuration conf = context.getConfiguration();
+            
+            
+            
+            //Generazione casuale centroidi TODO: da spostare nel main prima del primo ciclo
+            int i = 0;
+            while(i<k){
+                PointWritable centroid = new PointWritable();
+                int j=0;
+                while(j<d){
+                    centroid.components.add(Math.random()); //Ipotizzo punti con componenti comprese tra 0 e 1 (bata standardizzarli)
+                }
+                centroids.add(centroid);
+                i++;
+            }
+            
+            
 
             // Legge la riga dal file di input
+            // x, y, z...
             String line = value.toString();
-
-            // setta la chiave in output 
-            outputKey.set("");
-            // setta il valore in output 
-            outputValue.set("");
+            for(String component: line.split(",")){
+                outputValue.components.add(Double.valueOf(component));
+            }
+            
+            // TODO: calcolo delle distanze con ogni centroide tramite e inserimento del key come indice del centroide più vicino
+            
             // inserisce la coppia chiave-valore nel contesto
-            context.write(outputKey, outputValue);
+                context.write(outputKey, outputValue);
+
+        }
+    }
+    
+    // Sottoclasse che implemeta il codice e le variabili del reducer
+    public static class KMeansCombiner extends Reducer<Text, Text, NullWritable, Text> {
+
+        // codice del combiner
+        @Override
+        //Un combiner non ha una classe propria ma può essere implementato come reducer
+        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
+            Configuration conf = context.getConfiguration();
+            for (Text val : values) {
+            }
+            context.write(null, null);
         }
     }
 
@@ -93,7 +131,7 @@ public class KMeans {
         job.getConfiguration().set("k", otherArgs[3]); // k = colonne di N
 
         // Carica la classe base
-        job.setJarByClass(MatrixMultiplicator.class);
+        job.setJarByClass(KMeans.class);
 
         // Carica la sottoclasse del mapper
         job.setMapperClass(KMeansMapper.class);

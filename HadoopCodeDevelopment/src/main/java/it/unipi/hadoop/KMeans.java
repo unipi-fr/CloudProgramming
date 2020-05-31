@@ -37,67 +37,91 @@ public class KMeans {
             // key = indice della riga del file
             // value = riga del file
             // Preleva la struttura che contiene la configurazione
-            ArrayList<PointWritable> centroids = null; //TODO: leggere da conf (Centri cluster)
-            int k = 0; //TODO: leggere da conf (Numero di cluster)
-            int d = 0; //TODO: leggere da conf (Dimensione punti)
             Configuration conf = context.getConfiguration();
-            
-            
-            
-            //Generazione casuale centroidi TODO: da spostare nel main prima del primo ciclo
-            int i = 0;
-            while(i<k){
-                PointWritable centroid = new PointWritable();
-                int j=0;
-                while(j<d){
-                    centroid.components.add(Math.random()); //Ipotizzo punti con componenti comprese tra 0 e 1 (bata standardizzarli)
+            ArrayList<PointWritable> centroids = new ArrayList();
+            int k = conf.getInt("k", 0);
+            int d = conf.getInt("d", 0);
+
+            // Lettura dei centroidi *nello stesso ordine* in cui sono stati passati
+            int index = 0;
+            while (index < k) {
+                try {
+                    centroids.add(index, PointWritable.fromString(conf.get("centroid-" + index)));
+                } catch (ClassNotFoundException ex) {
+                    System.err.println("A problem occurred in passing the centroids: " + ex.getMessage());
                 }
-                centroids.add(centroid);
-                i++;
+                index++;
             }
-            
-            
 
             // Legge la riga dal file di input
             // x, y, z...
             String line = value.toString();
-            for(String component: line.split(",")){
+            for (String component : line.split(",")) {
                 outputValue.components.add(Double.valueOf(component));
             }
-            
-            // TODO: calcolo delle distanze con ogni centroide tramite e inserimento del key come indice del centroide più vicino
-            
+
+            double minDistance = 2; //Ipotizzo punti con componenti comprese tra 0 e 1
+            for (PointWritable centroid : centroids) {
+                double distance = PointWritable.distance(2, centroid, outputValue);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    outputKey.set(centroids.indexOf(centroid));
+                }
+            }
+
             // inserisce la coppia chiave-valore nel contesto
-                context.write(outputKey, outputValue);
+            context.write(outputKey, outputValue);
 
         }
     }
-    
+
     // Sottoclasse che implemeta il codice e le variabili del reducer
-    public static class KMeansCombiner extends Reducer<Text, Text, NullWritable, Text> {
+    public static class KMeansCombiner extends Reducer<IntWritable, PointWritable, IntWritable, PointWritable> {
+
+        // IMPORTANTE: usare delle variabili "final" per passare la chiave e il valore al context!
+        private final IntWritable outputKey = new IntWritable();
+        private final PointWritable outputValue = new PointWritable();
 
         // codice del combiner
         @Override
         //Un combiner non ha una classe propria ma può essere implementato come reducer
-        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-            Configuration conf = context.getConfiguration();
-            for (Text val : values) {
+        public void reduce(IntWritable key, Iterable<PointWritable> points, Context context) throws IOException, InterruptedException {
+            outputKey.set(key.get());
+            boolean first = true;
+            for (PointWritable point : points) {
+                if (first = true) {
+                    outputValue.inizializeCopy(point);
+                } else {
+                    outputValue.sum(point);
+                }
+                first = false;
             }
-            context.write(null, null);
+            context.write(outputKey, outputValue);
         }
     }
 
     // Sottoclasse che implemeta il codice e le variabili del reducer
-    public static class KMeansReducer extends Reducer<Text, Text, NullWritable, Text> {
+    public static class KMeansReducer extends Reducer<IntWritable, PointWritable, IntWritable, PointWritable> {
+
+        private final IntWritable outputKey = new IntWritable();
+        private final PointWritable outputValue = new PointWritable();
 
         // codice del reducer
         @Override
         //Uno per chiave!
-        public void reduce(Text key, Iterable<Text> values, Context context) throws IOException, InterruptedException {
-            Configuration conf = context.getConfiguration();
-            for (Text val : values) {
+        public void reduce(IntWritable key, Iterable<PointWritable> points, Context context) throws IOException, InterruptedException {
+            outputKey.set(key.get());
+            boolean first = true;
+            for (PointWritable point : points) {
+                if (first = true) {
+                    outputValue.inizializeCopy(point);
+                } else {
+                    outputValue.sum(point);
+                }
+                first = false;
             }
-            context.write(null, null);
+            outputValue.computeAndSetBarycenter();
+            context.write(outputKey, outputValue);
         }
     }
 
@@ -110,25 +134,39 @@ public class KMeans {
         String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 
         // Errore se il numero di argomenti è diverso da quello previsto
-        if (otherArgs.length != 5) {
-            System.err.println("Usage: SortInMemory_MovingAverageDriver <input matrixes M,N> <i> <j> <k> <output MxN>");
+        if (otherArgs.length != 4) {
+            System.err.println("Usage: KMeans <input points> <d> <k> <output clusters centroids>");
             System.exit(1);
         }
 
         // Print degli argomenti da riga di comando
-        System.out.println("args[0]: <input matrixes M,N>=" + otherArgs[0]);
-        System.out.println("args[1]: <i>=" + otherArgs[1]);
-        System.out.println("args[2]: <j>=" + otherArgs[2]);
-        System.out.println("args[3]: <k>=" + otherArgs[3]);
-        System.out.println("args[4]: <output MxN>=" + otherArgs[4]);
+        System.out.println("args[0]: <input points>=" + otherArgs[0]); // FIle di input
+        System.out.println("args[1]: <d>=" + otherArgs[1]); // Numero componenti per punto
+        System.out.println("args[2]: <k>=" + otherArgs[2]); // Numero classi
+        System.out.println("args[3]: <output cluster centroids>=" + otherArgs[3]); // File di output
+
+        ArrayList<PointWritable> centroids = new ArrayList();
+        int i = 0;
+        while (i < Integer.getInteger(otherArgs[2])) {
+            PointWritable centroid = new PointWritable();
+            int j = 0;
+            while (j < Integer.getInteger(otherArgs[1])) {
+                centroid.components.add(Math.random()); //Ipotizzo punti con componenti comprese tra 0 e 1 (bata standardizzarli)
+            }
+            centroids.add(centroid);
+            i++;
+        }
 
         // Assegna la classe del job
-        Job job = Job.getInstance(conf, "MatrixMultiplicator");
+        Job job = Job.getInstance(conf, "KMeans");
 
         // Inserisce nella struttura di configurazione i nomi dei campi e i loro valori
-        job.getConfiguration().set("i", otherArgs[1]); // i = righe di M
-        job.getConfiguration().set("j", otherArgs[2]); // j = colonne di M o righe di N
-        job.getConfiguration().set("k", otherArgs[3]); // k = colonne di N
+        job.getConfiguration().set("d", otherArgs[1]);
+        job.getConfiguration().set("k", otherArgs[2]);
+        int index = 0;
+        centroids.forEach((centroid) -> {
+            job.getConfiguration().set("centroid-" + index, centroid.toString());
+        });
 
         // Carica la classe base
         job.setJarByClass(KMeans.class);
@@ -136,22 +174,24 @@ public class KMeans {
         // Carica la sottoclasse del mapper
         job.setMapperClass(KMeansMapper.class);
         // Carica la sottoclasse del reducer
+        job.setCombinerClass(KMeansCombiner.class);
+        // Carica la sottoclasse del reducer
         job.setReducerClass(KMeansReducer.class);
 
         // I reducer sono limitati a 3 per volta
         job.setNumReduceTasks(3);
 
         // define mapper's output key-value format
-        job.setMapOutputKeyClass(Text.class);
-        job.setMapOutputValueClass(Text.class);
+        job.setMapOutputKeyClass(IntWritable.class);
+        job.setMapOutputValueClass(PointWritable.class);
 
-        // define reducer's output key-value format
-        job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(Text.class);
+        // define reducer's and combiner's output key-value format
+        job.setOutputKeyClass(IntWritable.class);
+        job.setOutputValueClass(PointWritable.class);
 
         // define I/O
         FileInputFormat.addInputPath(job, new Path(otherArgs[0]));  //File che il mapper legge riga per riga
-        FileOutputFormat.setOutputPath(job, new Path(otherArgs[4]));
+        FileOutputFormat.setOutputPath(job, new Path(otherArgs[3]));
 
         job.setInputFormatClass(TextInputFormat.class);
         job.setOutputFormatClass(TextOutputFormat.class);

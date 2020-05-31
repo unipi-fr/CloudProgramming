@@ -1,14 +1,21 @@
 package it.unipi.hadoop;
 
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Base64;
 import org.apache.hadoop.io.Writable;
 
-public class PointWritable implements Writable {
+public class PointWritable implements Writable, Serializable {
 
     public ArrayList<Double> components = new ArrayList<>();
+    public int summedPoints = 1;
 
     public PointWritable() {}
 
@@ -28,7 +35,26 @@ public class PointWritable implements Writable {
     public void sum(PointWritable P) {
         int index = 0;
         for (double componentToSum : P.components) {
-            components.add(index, components.get(index) + componentToSum);
+            components.set(index, components.get(index) + componentToSum);
+            index++;
+            summedPoints += P.summedPoints;
+        }
+    }
+    
+    // Copia componente per componente
+    public void inizializeCopy(PointWritable P) {
+        int index = 0;
+        for (double component : P.components) {
+            components.add(index, component);
+            index++;
+        }
+    }
+    
+    // Calcola il baricentro e setta i componenti con i suoi valori
+    public void computeAndSetBarycenter() {
+        int index = 0;
+        for (double component : components) {
+            components.set(index, component / summedPoints);
             index++;
         }
     }
@@ -46,10 +72,29 @@ public class PointWritable implements Writable {
             components.add(in.readDouble());
         }
     }
-
+ 
+    // Point from String
+    public static PointWritable fromString( String s ) throws IOException ,
+                                                       ClassNotFoundException {
+        byte [] data = Base64.getDecoder().decode( s );
+        PointWritable point;
+        try (ObjectInputStream ois = new ObjectInputStream( 
+                new ByteArrayInputStream(  data ) )) {
+            point = (PointWritable) ois.readObject();
+        }
+        return point;
+   }
+    
+    // Point to String
     @Override
-    public String toString() {
-        return components.toString();
+    public String toString( ) {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        try (ObjectOutputStream oos = new ObjectOutputStream( baos )) {
+            oos.writeObject( this );
+        } catch (IOException ex) {
+            System.err.println("Error in converting to string: " + ex.getMessage());
+        }
+        return Base64.getEncoder().encodeToString(baos.toByteArray()); 
     }
 
 }

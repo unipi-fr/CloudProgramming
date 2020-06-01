@@ -86,8 +86,7 @@ public class PointWritable implements Writable, Serializable {
    }
     
     // Point to String
-    @Override
-    public String toString( ) {
+    public String serialize( ) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         try (ObjectOutputStream oos = new ObjectOutputStream( baos )) {
             oos.writeObject( this );
@@ -95,6 +94,12 @@ public class PointWritable implements Writable, Serializable {
             System.err.println("Error in converting to string: " + ex.getMessage());
         }
         return Base64.getEncoder().encodeToString(baos.toByteArray()); 
+    }
+    
+    // Point to String
+    @Override
+    public String toString( ) {
+        return components.toString();
     }
 
 }

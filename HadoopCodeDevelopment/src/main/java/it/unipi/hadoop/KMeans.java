@@ -8,7 +8,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
-import org.apache.hadoop.io.NullWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -32,19 +31,22 @@ public class KMeans {
         @Override
         //Uno per riga del file di input!
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
-
+            
+            System.out.println("DEBUG | Mapper ID: " + context.getJobID());
+            
             // Il mapper prende SEMPRE in ingresso un file e lo scorre riga per riga
             // key = indice della riga del file
             // value = riga del file
             // Preleva la struttura che contiene la configurazione
             Configuration conf = context.getConfiguration();
-            ArrayList<PointWritable> centroids = new ArrayList();
-            int k = conf.getInt("k", 0);
-            int d = conf.getInt("d", 0);
+            ArrayList<PointWritable> centroids = new ArrayList<>();
+            int k = Integer.parseInt(conf.get("k"));
+            //int d = conf.getInt("d", 0);
 
             // Lettura dei centroidi *nello stesso ordine* in cui sono stati passati
             int index = 0;
             while (index < k) {
+                System.out.println("DEBUG | Mapper " + context.getJobID() +" centroid "+index+" string:" + conf.get("centroid-" + index));
                 try {
                     centroids.add(index, PointWritable.fromString(conf.get("centroid-" + index)));
                 } catch (ClassNotFoundException ex) {
@@ -77,7 +79,7 @@ public class KMeans {
 
     // Sottoclasse che implemeta il codice e le variabili del reducer
     public static class KMeansCombiner extends Reducer<IntWritable, PointWritable, IntWritable, PointWritable> {
-
+        
         // IMPORTANTE: usare delle variabili "final" per passare la chiave e il valore al context!
         private final IntWritable outputKey = new IntWritable();
         private final PointWritable outputValue = new PointWritable();
@@ -86,9 +88,15 @@ public class KMeans {
         @Override
         //Un combiner non ha una classe propria ma può essere implementato come reducer
         public void reduce(IntWritable key, Iterable<PointWritable> points, Context context) throws IOException, InterruptedException {
+           
+            System.out.println("DEBUG | Combiner ID: " + context.getJobID());
+            
             outputKey.set(key.get());
+            System.out.println("DEBUG | Combiner "+context.getJobID()+" Key: " + outputKey);
+            
             boolean first = true;
             for (PointWritable point : points) {
+                System.out.println("DEBUG | Combiner "+context.getJobID()+"point: " + point.toString());
                 if (first = true) {
                     outputValue.inizializeCopy(point);
                 } else {
@@ -96,6 +104,7 @@ public class KMeans {
                 }
                 first = false;
             }
+            System.out.println("DEBUG | Combiner "+context.getJobID()+" <Key,Value>: <" + outputKey+","+outputValue.toString()+">");
             context.write(outputKey, outputValue);
         }
     }
@@ -110,6 +119,9 @@ public class KMeans {
         @Override
         //Uno per chiave!
         public void reduce(IntWritable key, Iterable<PointWritable> points, Context context) throws IOException, InterruptedException {
+            
+            System.out.println("DEBUG | Reducer ID: " + context.getJobID());
+            
             outputKey.set(key.get());
             boolean first = true;
             for (PointWritable point : points) {
@@ -145,14 +157,16 @@ public class KMeans {
         System.out.println("args[2]: <k>=" + otherArgs[2]); // Numero classi
         System.out.println("args[3]: <output cluster centroids>=" + otherArgs[3]); // File di output
 
-        ArrayList<PointWritable> centroids = new ArrayList();
+        ArrayList<PointWritable> centroids = new ArrayList<>();
         int i = 0;
-        while (i < Integer.getInteger(otherArgs[2])) {
+        while (i < Integer.parseInt(otherArgs[2])) {
             PointWritable centroid = new PointWritable();
             int j = 0;
-            while (j < Integer.getInteger(otherArgs[1])) {
+            while (j < Integer.parseInt(otherArgs[1])) {
                 centroid.components.add(Math.random()); //Ipotizzo punti con componenti comprese tra 0 e 1 (bata standardizzarli)
+                j++;
             }
+            System.out.println("DEBUG | Centroid "+i+" initial components: " + centroid.components);
             centroids.add(centroid);
             i++;
         }
@@ -164,9 +178,18 @@ public class KMeans {
         job.getConfiguration().set("d", otherArgs[1]);
         job.getConfiguration().set("k", otherArgs[2]);
         int index = 0;
-        centroids.forEach((centroid) -> {
-            job.getConfiguration().set("centroid-" + index, centroid.toString());
-        });
+        for(PointWritable centroid : centroids){
+            System.out.println("DEBUG | Centroid to String: " + centroid.serialize());
+            job.getConfiguration().set("centroid-" + index, centroid.serialize());
+            try {
+                System.out.println("DEBUG | Centroid from String: " + PointWritable.fromString(centroid.serialize()).components);
+            } catch (IOException ex) {
+                System.out.println("Errore io");
+            } catch (ClassNotFoundException ex) {
+                System.out.println("Errore classe");
+            }
+            index++;
+        }
 
         // Carica la classe base
         job.setJarByClass(KMeans.class);

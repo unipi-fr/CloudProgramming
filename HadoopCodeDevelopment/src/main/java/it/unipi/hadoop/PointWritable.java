@@ -16,6 +16,7 @@ public class PointWritable implements Writable, Serializable {
 
     public ArrayList<Double> components = new ArrayList<>();
     public int summedPoints = 1;
+    public int index = -1; //-1 se è un punto qualsiasi, altro se indice di un centroide
 
     public PointWritable() {}
 
@@ -25,7 +26,7 @@ public class PointWritable implements Writable, Serializable {
         int index = 0;
         for (double componentP1 : P1.components) {
             double componentP2 = P2.components.get(index);
-            sum += Math.pow((componentP1 + componentP2), distanceType);
+            sum += Math.pow((componentP1 - componentP2), distanceType);
             index++;
         }
         return Math.pow(sum, 1.0 / distanceType);
@@ -48,6 +49,17 @@ public class PointWritable implements Writable, Serializable {
             components.add(index, component);
             index++;
         }
+    }
+    
+    // Copia componente per componente
+    public void copy(PointWritable P) {
+        int index = 0;
+        for (double component : P.components) {
+            components.set(index, component);
+            index++;
+        }
+        index = P.index;
+        summedPoints = P.summedPoints;
     }
     
     // Calcola il baricentro e setta i componenti con i suoi valori
@@ -74,7 +86,7 @@ public class PointWritable implements Writable, Serializable {
     }
  
     // Point from String
-    public static PointWritable fromString( String s ) throws IOException ,
+    public static PointWritable deserialize( String s ) throws IOException ,
                                                        ClassNotFoundException {
         byte [] data = Base64.getDecoder().decode( s );
         PointWritable point;
@@ -99,7 +111,7 @@ public class PointWritable implements Writable, Serializable {
     // Point to String
     @Override
     public String toString( ) {
-        return components.toString();
+        return index + " " + components.toString();
     }
 
 }

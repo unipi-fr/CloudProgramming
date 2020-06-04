@@ -47,8 +47,7 @@ public class KMeans {
             //d è implicito nei centroidi
 
             // Lettura dei centroidi
-            int index = 0;
-            while (index < k) {
+            for (int index = 0; index < k; index++) {
                 try {
                     // I centroidi vengono passati come stringhe nella configurazione serializzandoli e poi deserializzandoli qua
                     centroids.add(index, Point.deserialize(conf.get("centroid-" + index)));
@@ -56,7 +55,6 @@ public class KMeans {
                 } catch (ClassNotFoundException ex) {
                     System.err.println("A problem occurred in passing the centroids: " + ex.getMessage());
                 }
-                index++;
             }
 
             // Il mapper prende SEMPRE in ingresso un file e lo scorre riga per riga
@@ -214,7 +212,7 @@ public class KMeans {
         int d = Integer.parseInt(otherArgs[1]);
 
         // Criterio di stop
-        double stopCriteria = 0.01*k; //TODO: farlo passare da riga di comando?
+        double stopCriteria = 0.01 * k; //TODO: farlo passare da riga di comando?
         // Numero massimo di iterazioni in caso di convergenza lenta
         int maxIterations = 100; //TODO: farlo passare da riga di comando?
 
@@ -223,12 +221,12 @@ public class KMeans {
         double centroidsMovementFactor = stopCriteria + 1;
 
         // Print degli argomenti da riga di comando
-        System.out.println("args[0]: <input points> = " + otherArgs[0]); // File di input
-        System.out.println("args[1]: <d> = " + d); // Numero componenti per punto
-        System.out.println("args[2]: <k> = " + k); // Numero centroidi = numero cluster
-        System.out.println("args[3]: <output cluster centroids> = " + otherArgs[3]); // Cartella di output
-        System.out.println("Stop Criteria = " + stopCriteria); // Cartella di output
-        System.out.println("Max Iteration = " + maxIterations); // Cartella di output
+        System.out.println("INFO | args[0]: <input points> = " + otherArgs[0]); // File di input
+        System.out.println("INFO | args[1]: <d> = " + d); // Numero componenti per punto
+        System.out.println("INFO | args[2]: <k> = " + k); // Numero centroidi = numero cluster
+        System.out.println("INFO | args[3]: <output cluster centroids> = " + otherArgs[3]); // Cartella di output
+        System.out.println("INFO | Stop Criteria = " + stopCriteria); // Cartella di output
+        System.out.println("INFO | Max Iteration = " + maxIterations); // Cartella di output
 
         // Array dei centroidi
         ArrayList<Point> centroids = new ArrayList<>();
@@ -241,14 +239,14 @@ public class KMeans {
             for (int componentIndex = 0; componentIndex < d; componentIndex++) {
                 centroid.components.add(Math.random()); //Ipotizzo punti con componenti comprese tra 0 e 1 (basta standardizzarli)
             }
-            System.out.println("DEBUG | Centroid " + centroid.index + " initial components: " + centroid.components);
+            System.out.println("INFO | Centroid " + centroid.index + " initial components: " + centroid.components);
             centroids.add(centroid);
         }
 
         // Loop di map-reduce fino a soddisfacimento criterio di stop o limite iterazioni
         for (int jobIndex = 0; jobIndex < maxIterations && centroidsMovementFactor > stopCriteria; ++jobIndex) {
 
-            System.out.println("DEBUG | Job " + jobIndex + " is running...");
+            System.out.println("INFO | Job " + jobIndex + " is running...");
 
             // Assegna la configurazione al job
             Job job = Job.getInstance(conf, "KMeans");
@@ -291,7 +289,7 @@ public class KMeans {
             job.setOutputFormatClass(TextOutputFormat.class);
 
             // Aspetta finisca il map-reduce e lo notifica
-            System.out.println("DEBUG | Job " + jobIndex + " completato con: " + job.waitForCompletion(true));
+            System.out.println("INFO | Job " + jobIndex + " completato con: " + job.waitForCompletion(true));
 
             // Legge il risultato del precedente job e preleva i centroidi
             // Se qalche centroide non aveva punti assegnati non viene inserito nell'output
@@ -328,16 +326,17 @@ public class KMeans {
             centroidsMovementFactor = 0;
             for (int centroidIndex = 0; centroidIndex < k; centroidIndex++) {
                 Point oldCentroid = Point.deserialize(job.getConfiguration().get("centroid-" + centroidIndex));
-                System.out.println("DEBUG | New centroid : " + centroids.get(centroidIndex));
-                System.out.println("DEBUG | Old centroid : " + oldCentroid);
+                System.out.println("INFO | New centroid : " + centroids.get(centroidIndex));
+                System.out.println("INFO | Old centroid : " + oldCentroid);
                 centroidsMovementFactor += Point.distance(distanceType, oldCentroid, centroids.get(centroidIndex));
             }
-            System.out.println("DEBUG | Centroid Movement Factor = " + centroidsMovementFactor);
+            System.out.println("INFO | Centroid Movement Factor = " + centroidsMovementFactor);
         }
 
         // Convergenza e conclusione algoritmo
+        System.out.println("INFO | Algorithm completed ---------------------------------------------");
         for (int centroidIndex = 0; centroidIndex < k; centroidIndex++) {
-            System.out.println("DEBUG | Final centroid : " + centroids.get(centroidIndex));
+            System.out.println("INFO | Final centroid : " + centroids.get(centroidIndex));
         }
         System.exit(1);
     }

@@ -3,6 +3,8 @@ package it.unipi.hadoop;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 
 import org.apache.hadoop.io.Text;
@@ -191,6 +193,9 @@ public class KMeans {
     }
 
     public static void main(String[] args) throws Exception {
+        
+        // Per calcolare le performance
+        Instant start = Instant.now();
 
         // Struttura che contiene la configurazione
         Configuration conf = new Configuration();
@@ -246,7 +251,7 @@ public class KMeans {
         // Loop di map-reduce fino a soddisfacimento criterio di stop o limite iterazioni
         for (int jobIndex = 0; jobIndex < maxIterations && centroidsMovementFactor > stopCriteria; ++jobIndex) {
 
-            System.out.println("INFO | Job " + jobIndex + " is running...");
+            System.out.println("INFO | Job " + (jobIndex + 1) + " is running...");
 
             // Assegna la configurazione al job
             Job job = Job.getInstance(conf, "KMeans");
@@ -289,7 +294,7 @@ public class KMeans {
             job.setOutputFormatClass(TextOutputFormat.class);
 
             // Aspetta finisca il map-reduce e lo notifica
-            System.out.println("INFO | Job " + jobIndex + " completato con: " + job.waitForCompletion(true));
+            System.out.println("INFO | Job " + (jobIndex + 1) + " completato con: " + job.waitForCompletion(true));
 
             // Legge il risultato del precedente job e preleva i centroidi
             // Se qalche centroide non aveva punti assegnati non viene inserito nell'output
@@ -331,10 +336,11 @@ public class KMeans {
                 centroidsMovementFactor += Point.distance(distanceType, oldCentroid, centroids.get(centroidIndex));
             }
             System.out.println("INFO | Centroid Movement Factor = " + centroidsMovementFactor);
+            System.out.println("INFO | job " + (jobIndex + 1) + " concluded in "+ Duration.between(start, Instant.now()).getSeconds() +" seconds from start");
         }
 
         // Convergenza e conclusione algoritmo
-        System.out.println("INFO | Algorithm completed ---------------------------------------------");
+        System.out.println("INFO | Algorithm completed in "+ Duration.between(start, Instant.now()).getSeconds() +" seconds -------------------------------------------------------");
         for (int centroidIndex = 0; centroidIndex < k; centroidIndex++) {
             System.out.println("INFO | Final centroid : " + centroids.get(centroidIndex));
         }

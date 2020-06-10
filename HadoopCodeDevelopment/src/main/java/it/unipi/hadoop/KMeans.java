@@ -12,7 +12,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
@@ -30,11 +29,11 @@ public class KMeans {
     public static final int distanceType = 2;
 
     // Sottoclasse che implemeta il codice e le variabili del mapper
-    public static class KMeansMapper extends Mapper<LongWritable, Text, IntWritable, Text> {
+    public static class KMeansMapper extends Mapper<LongWritable, Text, Point, Point> {
 
         // IMPORTANTE: usare delle variabili "final" per passare la chiave e il valore al context!
-        private final IntWritable outputKey = new IntWritable();
-        private final Text outputValue = new Text();
+        private final Point outputKey = new Point();
+        private final Point outputValue = new Point();
 
         // codice del mapper
         @Override
@@ -46,7 +45,7 @@ public class KMeans {
             Configuration conf = context.getConfiguration();
             ArrayList<Point> centroids = new ArrayList<>();
             int k = Integer.parseInt(conf.get("k"));
-            //d è implicito nei centroidi
+            int d = Integer.parseInt(conf.get("d"));
 
             // Lettura dei centroidi
             for (int index = 0; index < k; index++) {
@@ -71,21 +70,22 @@ public class KMeans {
             for (String component : line.split(",")) {
                 point.components.add(Double.valueOf(component));
             }
+            point.dimensions = d;
             //System.out.println("DEBUG | Mapper " + context.getJobID() + " point: " + point.toString());
 
             // Calcola qual è il centroide più vicino a quel punto
             // Setta di conseguenza la chiave e il valore in uscita
-            double minDistance = 2; //Ipotizzo punti con componenti comprese tra 0 e 1
+            double minDistance = Double.MAX_VALUE;
             for (Point centroid : centroids) {
                 double distance = Point.distance(distanceType, centroid, point);
                 if (distance < minDistance) {
                     minDistance = distance;
-                    outputKey.set(centroid.index);
+                    outputKey.set(centroid);
                 }
                 //System.out.println("DEBUG | Mapper " + context.getJobID() + " distance from centroid " + centroid.toString() + " = " + distance);
             }
             // Per essere passato correttamente il punto deve essere deserializzato e passato come stringa
-            outputValue.set(point.serialize());
+            outputValue.set(point);
             //System.out.println("DEBUG | Mapper " + context.getJobID() + " <Key,Value>: <" + outputKey + "," + outputValue.toString() + ">");
 
             // inserisce la coppia chiave-valore nel contesto
@@ -96,37 +96,34 @@ public class KMeans {
     }
 
     // Sottoclasse che implemeta il codice e le variabili del combiner
-    public static class KMeansCombiner extends Reducer<IntWritable, Text, IntWritable, Text> {
+    public static class KMeansCombiner extends Reducer<Point, Point, Point, Point> {
 
         // IMPORTANTE: usare delle variabili "final" per passare la chiave e il valore al context!
-        private final IntWritable outputKey = new IntWritable();
-        private final Text outputValue = new Text();
+        private final Point outputKey = new Point();
+        private final Point outputValue = new Point();
 
         // codice del combiner
         @Override
         //Un combiner non ha una classe propria ma può essere implementato come reducer
         // Il combiner riceve una lista di punti associati ad un centroide e ne calcola la somma parziale
-        public void reduce(IntWritable key, Iterable<Text> points, Context context) throws IOException, InterruptedException {
+        public void reduce(Point key, Iterable<Point> points, Context context) throws IOException, InterruptedException {
 
-            // System.out.println("DEBUG | Combiner ID: " + context.getJobID());
+            //System.out.println("DEBUG | Combiner ID: " + context.getJobID());
             // La chiave in input, l'indice del centroide, è la stessa che va in output
-            outputKey.set(key.get());
-            // System.out.println("DEBUG | Combiner " + context.getJobID() + " Key: " + outputKey);
+            outputKey.set(key);
+            //System.out.println("DEBUG | Combiner " + context.getJobID() + " Key: " + outputKey);
 
             // Deserializza i punti ricevuti nella lista di valori in input
             // e calcola contemporaneamente la somma parziale delle componenti
             boolean first = true;
-            Point point = null;
-            Point sumPoint = null;
-            while (points.iterator().hasNext()) {
-                try {
-                    point = Point.deserialize(points.iterator().next().toString());
-                } catch (ClassNotFoundException ex) {
-                    System.err.println("A problem occurred in passing the point to combiner: " + ex.getMessage());
-                }
-                // System.out.println("DEBUG | Combiner " + context.getJobID() + " point: " + point.toString());
+            Point point = new Point();
+            Point sumPoint = new Point();
+            for (Point p : points) {
+                //System.out.println(p);
+                point.set(p);
+                //System.out.println("DEBUG | Combiner " + context.getJobID() + " point: " + point.toString());
                 if (first == true) { // Se è il primo
-                    sumPoint = point;
+                    sumPoint.set(point);
                     first = false;
                 } else { // Altrimenti somma le componenti
                     sumPoint.sum(point);
@@ -134,7 +131,7 @@ public class KMeans {
             }
 
             // Serializza il punto che contiene la somma parziale delle componenti per essere passato come value
-            outputValue.set(sumPoint.serialize());
+            outputValue.set(sumPoint);
             //System.out.println("DEBUG | Combiner " + context.getJobID() + " <Key,Value>: <" + outputKey + "," + sumPoint.toString() + ">");
 
             // inserisce la coppia chiave-valore nel contesto
@@ -144,36 +141,33 @@ public class KMeans {
     }
 
     // Sottoclasse che implemeta il codice e le variabili del reducer
-    public static class KMeansReducer extends Reducer<IntWritable, Text, IntWritable, Text> {
+    public static class KMeansReducer extends Reducer<Point, Point, Point, Text> {
 
         // IMPORTANTE: usare delle variabili "final" per passare la chiave e il valore al context!
-        private final IntWritable outputKey = new IntWritable();
+        private final Point outputKey = new Point();
         private final Text outputValue = new Text();
 
         // Codice del reducer
         // Un reducer per chiave
         @Override
-        public void reduce(IntWritable key, Iterable<Text> points, Context context) throws IOException, InterruptedException {
+        public void reduce(Point key, Iterable<Point> points, Context context) throws IOException, InterruptedException {
 
-            // System.out.println("DEBUG | Reducer ID: " + context.getJobID());
+            //System.out.println("DEBUG | Reducer ID: " + context.getJobID());
             // La chiave in input, l'indice del centroide, è la stessa che va in output
-            outputKey.set(key.get());
+            outputKey.set(key);
 
             // Deserializza i punti con le somme parziali ricevuti nella lista di valori in input
             // e calcola contemporaneamente la somma di tutte le componenti
-            Point newCentroid = null;
-            Point point = null;
+            Point newCentroid = new Point();
+            Point point = new Point();
             boolean first = true;
-            while (points.iterator().hasNext()) {
-                try {
-                    point = Point.deserialize(points.iterator().next().toString());
-                } catch (ClassNotFoundException ex) {
-                    System.err.println("A problem occurred in passing the point to combiner: " + ex.getMessage());
-                }
+            for (Point p : points) {
+                point.set(p);
+                //System.out.println("DEBUG | Reducer " + context.getJobID() + " partial sum " + point);
                 if (first == true) {
-                    newCentroid = point;
+                    newCentroid.set(point);
                     // Setta l'indice del nuovo centroide come quello del suo predecessore
-                    newCentroid.index = key.get();
+                    newCentroid.index = key.index;
                     first = false;
                 } else {
                     newCentroid.sum(point);
@@ -193,7 +187,7 @@ public class KMeans {
     }
 
     public static void main(String[] args) throws Exception {
-        
+
         // Per calcolare le performance
         Instant start = Instant.now();
 
@@ -241,13 +235,14 @@ public class KMeans {
             Point centroid = new Point();
             // Indice del centroide
             centroid.index = centroidIndex;
+            centroid.dimensions = d;
             for (int componentIndex = 0; componentIndex < d; componentIndex++) {
                 centroid.components.add(Math.random()); //Ipotizzo punti con componenti comprese tra 0 e 1 (basta standardizzarli)
             }
             System.out.println("INFO | Centroid " + centroid.index + " initial components: " + centroid.components);
             centroids.add(centroid);
         }
-
+        
         // Loop di map-reduce fino a soddisfacimento criterio di stop o limite iterazioni
         for (int jobIndex = 0; jobIndex < maxIterations && centroidsMovementFactor > stopCriteria; ++jobIndex) {
 
@@ -278,11 +273,11 @@ public class KMeans {
             // I reducer sono limitati a 3 per volta
             // job.setNumReduceTasks(3);
             // Definisce i formati key-value del mapper
-            job.setMapOutputKeyClass(IntWritable.class);
-            job.setMapOutputValueClass(Text.class);
+            job.setMapOutputKeyClass(Point.class);
+            job.setMapOutputValueClass(Point.class);
 
             // Definisce i formati key-value del reducer e combiner
-            job.setOutputKeyClass(IntWritable.class);
+            job.setOutputKeyClass(Point.class);
             job.setOutputValueClass(Text.class);
 
             // Definisce i file di input e output
@@ -336,11 +331,11 @@ public class KMeans {
                 centroidsMovementFactor += Point.distance(distanceType, oldCentroid, centroids.get(centroidIndex));
             }
             System.out.println("INFO | Centroid Movement Factor = " + centroidsMovementFactor);
-            System.out.println("INFO | job " + (jobIndex + 1) + " concluded in "+ Duration.between(start, Instant.now()).getSeconds() +" seconds from start");
+            System.out.println("INFO | job " + (jobIndex + 1) + " concluded in " + Duration.between(start, Instant.now()).getSeconds() + " seconds from start");
         }
 
         // Convergenza e conclusione algoritmo
-        System.out.println("INFO | Algorithm completed in "+ Duration.between(start, Instant.now()).getSeconds() +" seconds -------------------------------------------------------");
+        System.out.println("INFO | Algorithm completed in " + Duration.between(start, Instant.now()).getSeconds() + " seconds -------------------------------------------------------");
         for (int centroidIndex = 0; centroidIndex < k; centroidIndex++) {
             System.out.println("INFO | Final centroid : " + centroids.get(centroidIndex));
         }

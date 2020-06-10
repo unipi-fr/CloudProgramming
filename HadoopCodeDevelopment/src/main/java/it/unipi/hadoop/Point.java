@@ -2,25 +2,30 @@ package it.unipi.hadoop;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Objects;
+import org.apache.hadoop.io.WritableComparable;
 
 // Classe che rappresenta un qualsiasi punto
-public class Point implements Serializable {
+public class Point implements WritableComparable, Serializable {
 
     // Componenti del punto
     public ArrayList<Double> components = new ArrayList<>();
     // Per le somme parziali, numero di punti sommati
     public int summedPoints = 1;
-    //-1 se è un punto qualsiasi, altro se indice di un centroide
-    public int index = -1; 
+    // -1 se è un punto qualsiasi, altro se indice di un centroide
+    public int index = -1;
+    // Number of components
+    public int dimensions = 1;
 
-    public Point() {}
-
+ 
     // Restituisce la distanza di tipologia distanceType tra due punti, STATICA
     public static double distance(int distanceType, Point P1, Point P2) {
         double sum = 0;
@@ -42,24 +47,15 @@ public class Point implements Serializable {
             summedPoints += P.summedPoints;
         }
     }
-
-    // Aggiunge alla lista delle componenti quelle di P
-    public void inizializeCopy(Point P) {
-        int indexP = 0;
-        for (double component : P.components) {
-            components.add(indexP, component);
-            indexP++;
+    
+    // Setta il punto attraverso il punto passato
+    void set(Point P) {
+        components.clear();
+        for(double component : P.components){
+            components.add(component);
         }
-    }
-
-    // Copia componente per componente
-    public void copy(Point P) {
-        int indexP = 0;
-        for (double component : P.components) {
-            components.set(indexP, component);
-            indexP++;
-        }
-        indexP = P.index;
+        index = P.index;
+        dimensions = P.dimensions;
         summedPoints = P.summedPoints;
     }
 
@@ -70,6 +66,7 @@ public class Point implements Serializable {
             components.set(pointIndex, component / summedPoints);
             pointIndex++;
         }
+        summedPoints = 1;
     }
 
     // Deserializzazione di un punto da una stringa, STATICA
@@ -97,7 +94,58 @@ public class Point implements Serializable {
     // Point to String
     @Override
     public String toString() {
-        return index + " " + components.toString();
+        return "idex:"+index + "-" +"summedPoints:"+summedPoints + "-" +"dimensions:"+dimensions + "-" + components.toString().replaceAll(" ", "");
+    }
+
+    @Override
+    public void write(DataOutput out) throws IOException {
+        out.writeInt(index);
+        out.writeInt(summedPoints);
+        out.writeInt(dimensions);
+        for (int i = 0; i < dimensions; i++) {
+            out.writeDouble(components.get(i));
+        }
+    }
+
+    @Override
+    public void readFields(DataInput in) throws IOException {
+        components.clear();
+        index = in.readInt();
+        summedPoints = in.readInt();
+        dimensions = in.readInt();
+        for (int i = 0; i < dimensions; i++) {
+            components.add(in.readDouble());
+        }
+    }
+
+    @Override // Quando inserito come chiave, serve per comparare le chiavi
+    public int compareTo(Object o) {
+        Point p = (Point) o;
+        // Solo centroidi vengono inseriti come chiave, perciò avranno indici diversi
+        return (this.index < p.index ? -1 : (this.index == p.index ? 0 : 1));
+    }
+
+    @Override
+    public int hashCode() {
+        return components.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (obj == null) {
+            return false;
+        }
+        if (getClass() != obj.getClass()) {
+            return false;
+        }
+        final Point other = (Point) obj;
+        if (!Objects.equals(this.components, other.components)) {
+            return false;
+        }
+        return true;
     }
 
 }

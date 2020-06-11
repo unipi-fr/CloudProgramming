@@ -11,6 +11,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Objects;
+import static java.util.Objects.hash;
 import org.apache.hadoop.io.WritableComparable;
 
 // Classe che rappresenta un qualsiasi punto
@@ -43,17 +44,17 @@ public class Point implements WritableComparable, Serializable {
         int indexP = 0;
         for (double componentToSum : P.components) {
             components.set(indexP, components.get(indexP) + componentToSum);
-            indexP++;
-            summedPoints += P.summedPoints;
+            indexP++;                   
         }
+        summedPoints += P.summedPoints;  
     }
     
     // Setta il punto attraverso il punto passato
     void set(Point P) {
         components.clear();
-        for(double component : P.components){
+        P.components.forEach((component) -> {
             components.add(component);
-        }
+        });
         index = P.index;
         dimensions = P.dimensions;
         summedPoints = P.summedPoints;
@@ -127,7 +128,7 @@ public class Point implements WritableComparable, Serializable {
 
     @Override
     public int hashCode() {
-        return components.hashCode();
+        return hash(components,index,summedPoints,dimensions);
     }
 
     @Override
@@ -142,10 +143,7 @@ public class Point implements WritableComparable, Serializable {
             return false;
         }
         final Point other = (Point) obj;
-        if (!Objects.equals(this.components, other.components)) {
-            return false;
-        }
-        return true;
+        return Objects.equals(this.components, other.components);
     }
 
 }

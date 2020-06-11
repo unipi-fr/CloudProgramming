@@ -6,6 +6,8 @@ import java.io.InputStreamReader;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Random;
+import java.util.Scanner;
 
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.conf.Configuration;
@@ -40,7 +42,7 @@ public class KMeans {
         //Uno per riga del file di input
         public void map(LongWritable key, Text value, Context context) throws IOException, InterruptedException {
 
-            //System.out.println("DEBUG | Mapper ID: " + context.getJobID());
+            //System.out.println("DEBUG | Mapper start ----------");
             // Preleva la struttura che contiene la configurazione
             Configuration conf = context.getConfiguration();
             ArrayList<Point> centroids = new ArrayList<>();
@@ -52,7 +54,7 @@ public class KMeans {
                 try {
                     // I centroidi vengono passati come stringhe nella configurazione serializzandoli e poi deserializzandoli qua
                     centroids.add(index, Point.deserialize(conf.get("centroid-" + index)));
-                    //System.out.println("DEBUG | Mapper " + context.getJobID() + " centroid  :" + centroids.get(index));
+                    //System.out.println("DEBUG | Mapper, centroid  :" + centroids.get(index));
                 } catch (ClassNotFoundException ex) {
                     System.err.println("A problem occurred in passing the centroids: " + ex.getMessage());
                 }
@@ -71,7 +73,7 @@ public class KMeans {
                 point.components.add(Double.valueOf(component));
             }
             point.dimensions = d;
-            //System.out.println("DEBUG | Mapper " + context.getJobID() + " point: " + point.toString());
+            //System.out.println("DEBUG | Mapper, point: " + point.toString());
 
             // Calcola qual è il centroide più vicino a quel punto
             // Setta di conseguenza la chiave e il valore in uscita
@@ -82,11 +84,11 @@ public class KMeans {
                     minDistance = distance;
                     outputKey.set(centroid);
                 }
-                //System.out.println("DEBUG | Mapper " + context.getJobID() + " distance from centroid " + centroid.toString() + " = " + distance);
+                //System.out.println("DEBUG | Mapper, distance from centroid " + centroid.toString() + " = " + distance);
             }
             // Per essere passato correttamente il punto deve essere deserializzato e passato come stringa
             outputValue.set(point);
-            //System.out.println("DEBUG | Mapper " + context.getJobID() + " <Key,Value>: <" + outputKey + "," + outputValue.toString() + ">");
+            //System.out.println("DEBUG | Mapper, <Key,Value>: <" + outputKey + "," + outputValue.toString() + ">");
 
             // inserisce la coppia chiave-valore nel contesto
             // <indice del centroide più vicino, punto>
@@ -108,10 +110,10 @@ public class KMeans {
         // Il combiner riceve una lista di punti associati ad un centroide e ne calcola la somma parziale
         public void reduce(Point key, Iterable<Point> points, Context context) throws IOException, InterruptedException {
 
-            //System.out.println("DEBUG | Combiner ID: " + context.getJobID());
+            //System.out.println("DEBUG | Combiner start ----------");
             // La chiave in input, l'indice del centroide, è la stessa che va in output
             outputKey.set(key);
-            //System.out.println("DEBUG | Combiner " + context.getJobID() + " Key: " + outputKey);
+            //System.out.println("DEBUG | Combiner, Key: " + outputKey);
 
             // Deserializza i punti ricevuti nella lista di valori in input
             // e calcola contemporaneamente la somma parziale delle componenti
@@ -119,9 +121,8 @@ public class KMeans {
             Point point = new Point();
             Point sumPoint = new Point();
             for (Point p : points) {
-                //System.out.println(p);
                 point.set(p);
-                //System.out.println("DEBUG | Combiner " + context.getJobID() + " point: " + point.toString());
+                //System.out.println("DEBUG | Combiner, point: " + point.toString());
                 if (first == true) { // Se è il primo
                     sumPoint.set(point);
                     first = false;
@@ -132,7 +133,7 @@ public class KMeans {
 
             // Serializza il punto che contiene la somma parziale delle componenti per essere passato come value
             outputValue.set(sumPoint);
-            //System.out.println("DEBUG | Combiner " + context.getJobID() + " <Key,Value>: <" + outputKey + "," + sumPoint.toString() + ">");
+            //System.out.println("DEBUG | Combiner, <Key,Value>: <" + outputKey + "," + sumPoint.toString() + ">");
 
             // inserisce la coppia chiave-valore nel contesto
             // <indice del centroide, somma parziale punti assegnati ad esso>
@@ -152,7 +153,7 @@ public class KMeans {
         @Override
         public void reduce(Point key, Iterable<Point> points, Context context) throws IOException, InterruptedException {
 
-            //System.out.println("DEBUG | Reducer ID: " + context.getJobID());
+            //System.out.println("DEBUG | Reducer start ----------");
             // La chiave in input, l'indice del centroide, è la stessa che va in output
             outputKey.set(key);
 
@@ -163,7 +164,7 @@ public class KMeans {
             boolean first = true;
             for (Point p : points) {
                 point.set(p);
-                //System.out.println("DEBUG | Reducer " + context.getJobID() + " partial sum " + point);
+                //System.out.println("DEBUG | Reducer, partial sum " + point);
                 if (first == true) {
                     newCentroid.set(point);
                     // Setta l'indice del nuovo centroide come quello del suo predecessore
@@ -177,7 +178,7 @@ public class KMeans {
             // Media componente per componente partendo dall somma delle componenti e dal numero di punti sommati
             newCentroid.computeAndSetBarycenter();
 
-            //System.out.println("DEBUG | Reducer " + context.getJobID() + " <Key,Value>: <" + outputKey + "," + outputValue.toString() + ">");
+            //System.out.println("DEBUG | Reducer, <Key,Value>: <" + outputKey + "," + outputValue.toString() + ">");
             // Serializza il nuovo centroide come valore in output
             outputValue.set(newCentroid.serialize());
 
@@ -202,8 +203,8 @@ public class KMeans {
         String[] otherArgs = new GenericOptionsParser(conf, args).getRemainingArgs();
 
         // Errore se il numero di argomenti è diverso da quello previsto
-        if (otherArgs.length != 4) {
-            System.err.println("Usage: KMeans <input points> <d> <k> <output clusters centroids>");
+        if (otherArgs.length != 6) {
+            System.err.println("Usage: KMeans <input points> <d> <k> <stop_margin> <max_iterations> <output clusters centroids>");
             System.exit(1);
         }
 
@@ -211,9 +212,9 @@ public class KMeans {
         int d = Integer.parseInt(otherArgs[1]);
 
         // Criterio di stop
-        double stopCriteria = 0.01 * k; //TODO: farlo passare da riga di comando?
+        double stopCriteria = Double.valueOf(otherArgs[3]) * k;
         // Numero massimo di iterazioni in caso di convergenza lenta
-        int maxIterations = 100; //TODO: farlo passare da riga di comando?
+        int maxIterations = Integer.parseInt(otherArgs[4]); //per sicurezza
 
         // Il criterio di stop è la somma delle distanze dei centroidi da quelli al passo precedente
         // Inpostato ad un valore superiore al criterio di stop
@@ -223,13 +224,14 @@ public class KMeans {
         System.out.println("INFO | args[0]: <input points> = " + otherArgs[0]); // File di input
         System.out.println("INFO | args[1]: <d> = " + d); // Numero componenti per punto
         System.out.println("INFO | args[2]: <k> = " + k); // Numero centroidi = numero cluster
-        System.out.println("INFO | args[3]: <output cluster centroids> = " + otherArgs[3]); // Cartella di output
-        System.out.println("INFO | Stop Criteria = " + stopCriteria); // Cartella di output
-        System.out.println("INFO | Max Iteration = " + maxIterations); // Cartella di output
-
+        System.out.println("INFO | Stop Criteria = " + stopCriteria); 
+        System.out.println("INFO | args[4]: <max_iterations> = " + maxIterations); 
+        System.out.println("INFO | args[5]: <output cluster centroids> = " + otherArgs[5]); // Cartella di output
+       
         // Array dei centroidi
         ArrayList<Point> centroids = new ArrayList<>();
 
+        /* --- Scelta casuale dei centroidi ---
         // Inizialmente vengono scelte componenti casuali comprese tra 0 e 1 (basta standardizzarli)
         for (int centroidIndex = 0; centroidIndex < k; centroidIndex++) {
             Point centroid = new Point();
@@ -241,8 +243,43 @@ public class KMeans {
             }
             System.out.println("INFO | Centroid " + centroid.index + " initial components: " + centroid.components);
             centroids.add(centroid);
+        } */
+        
+        // Scelgo k centroidi casuali dal dataset usando il metodo della "reservoir list"
+        Path path = new Path(otherArgs[0]);
+        FileSystem fs = path.getFileSystem(conf);
+        String currentLine = null;
+        
+        //reservoirList è la lista delle linee selezionate
+        ArrayList<String> reservoirList = new ArrayList<>(k);
+        int count = 0;
+
+        Random ra = new Random();
+        int randomNumber = 0;
+        Scanner sc = new Scanner(fs.open(path)).useDelimiter("\n");
+
+        while (sc.hasNext()) {
+            currentLine = sc.next();
+            count++;
+            if (count <= k) {
+                reservoirList.add(currentLine);
+            } else if ((randomNumber = (int) ra.nextInt(count)) < k) {
+                reservoirList.set(randomNumber, currentLine);
+            }
         }
         
+        for (int centroidIndex = 0; centroidIndex < k; centroidIndex++) {
+            Point centroid = new Point();
+            // Indice del centroide
+            centroid.index = centroidIndex;
+            centroid.dimensions = d;
+            for (String component : reservoirList.get(centroidIndex).split(",")) {
+                centroid.components.add(Double.valueOf(component));
+            }
+            System.out.println("INFO | Centroid " + centroid.index + " initial components: " + centroid.components);
+            centroids.add(centroid);
+        }
+
         // Loop di map-reduce fino a soddisfacimento criterio di stop o limite iterazioni
         for (int jobIndex = 0; jobIndex < maxIterations && centroidsMovementFactor > stopCriteria; ++jobIndex) {
 
@@ -270,8 +307,8 @@ public class KMeans {
             // Carica la sottoclasse del reducer
             job.setReducerClass(KMeansReducer.class);
 
-            // I reducer sono limitati a 3 per volta
-            // job.setNumReduceTasks(3);
+            // I reducer sono limitati a 3 per volta 
+            //job.setNumReduceTasks(1);
             // Definisce i formati key-value del mapper
             job.setMapOutputKeyClass(Point.class);
             job.setMapOutputValueClass(Point.class);
@@ -282,7 +319,7 @@ public class KMeans {
 
             // Definisce i file di input e output
             FileInputFormat.addInputPath(job, new Path(otherArgs[0]));  //File che il mapper legge riga per riga
-            FileOutputFormat.setOutputPath(job, new Path(otherArgs[3] + "_" + jobIndex));
+            FileOutputFormat.setOutputPath(job, new Path(otherArgs[5] + "_" + jobIndex));
 
             // Definisce i formati di input e output
             job.setInputFormatClass(TextInputFormat.class);
@@ -295,8 +332,8 @@ public class KMeans {
             // Se qalche centroide non aveva punti assegnati non viene inserito nell'output
             // in quanto non arriva a nessun reducer, non è un problema perchè rimane il
             // valore che aveva alla vecchia iterazione
-            Path path = new Path(otherArgs[3] + "_" + jobIndex);
-            FileSystem fs = path.getFileSystem(conf);
+            path = new Path(otherArgs[5] + "_" + jobIndex);
+            fs = path.getFileSystem(conf);
             FileStatus[] fss = fs.listStatus(path);
             boolean first = true;
             // Itera tutti i file dentro la cartella di output prelevando il contenuto
@@ -304,10 +341,10 @@ public class KMeans {
                 // Salta il primo perchè non è di output
                 if (!first) {
                     path = status.getPath();
-                    BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(path)));
+                    BufferedReader bufRead = new BufferedReader(new InputStreamReader(fs.open(path)));
                     String line = "";
                     while (line != null) {
-                        line = br.readLine();
+                        line = bufRead.readLine();
                         if (line != null && !"null".equals(line)) {
                             Point newCentroid = Point.deserialize(line.split("\\s+")[1]);
                             centroids.set(newCentroid.index, newCentroid);
@@ -319,8 +356,8 @@ public class KMeans {
             }
 
             // Elimina l'output precedente e rinomina quello attuale in modo da avere una sola cartella
-            fs.delete(new Path(otherArgs[3]), true);
-            fs.rename(new Path(otherArgs[3] + "_" + jobIndex), new Path(otherArgs[3]));
+            fs.delete(new Path(otherArgs[5]), true);
+            fs.rename(new Path(otherArgs[5] + "_" + jobIndex), new Path(otherArgs[5]));
 
             // Calcola la somma delle distanze tra le vecchie posizioni dei centroidi e le nuove
             centroidsMovementFactor = 0;

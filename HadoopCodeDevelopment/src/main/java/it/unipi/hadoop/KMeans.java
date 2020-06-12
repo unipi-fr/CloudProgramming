@@ -250,7 +250,7 @@ public class KMeans {
         FileSystem fs = path.getFileSystem(conf);
         String currentLine = null;
         
-        //reservoirList è la lista delle linee selezionate
+        // reservoirList è la lista delle linee selezionate
         ArrayList<String> reservoirList = new ArrayList<>(k);
         int count = 0;
 
@@ -258,6 +258,7 @@ public class KMeans {
         int randomNumber = 0;
         Scanner sc = new Scanner(fs.open(path)).useDelimiter("\n");
 
+        // inizialmente ne aggiunge k poi con probabilità decrescente li sostituisce con una linea casuale del file
         while (sc.hasNext()) {
             currentLine = sc.next();
             count++;

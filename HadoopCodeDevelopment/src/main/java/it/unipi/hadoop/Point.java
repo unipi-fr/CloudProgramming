@@ -26,7 +26,6 @@ public class Point implements WritableComparable, Serializable {
     // Number of components
     public int dimensions = 1;
 
- 
     // Restituisce la distanza di tipologia distanceType tra due punti, STATICA
     public static double distance(int distanceType, Point P1, Point P2) {
         double sum = 0;
@@ -44,11 +43,11 @@ public class Point implements WritableComparable, Serializable {
         int indexP = 0;
         for (double componentToSum : P.components) {
             components.set(indexP, components.get(indexP) + componentToSum);
-            indexP++;                   
+            indexP++;
         }
-        summedPoints += P.summedPoints;  
+        summedPoints += P.summedPoints;
     }
-    
+
     // Setta il punto attraverso il punto passato
     void set(Point P) {
         components.clear();
@@ -95,7 +94,7 @@ public class Point implements WritableComparable, Serializable {
     // Point to String
     @Override
     public String toString() {
-        return "idex:"+index + "-" +"summedPoints:"+summedPoints + "-" +"dimensions:"+dimensions + "-" + components.toString().replaceAll(" ", "");
+        return "idex:" + index + "-" + "summedPoints:" + summedPoints + "-" + "dimensions:" + dimensions + "-" + components.toString().replaceAll(" ", "");
     }
 
     @Override
@@ -128,7 +127,7 @@ public class Point implements WritableComparable, Serializable {
 
     @Override
     public int hashCode() {
-        return hash(components,index,summedPoints,dimensions);
+        return hash(components, index, summedPoints, dimensions);
     }
 
     @Override
@@ -143,7 +142,16 @@ public class Point implements WritableComparable, Serializable {
             return false;
         }
         final Point other = (Point) obj;
-        return Objects.equals(this.components, other.components);
+        if (this.summedPoints != other.summedPoints) {
+            return false;
+        }
+        if (this.index != other.index) {
+            return false;
+        }
+        if (this.dimensions != other.dimensions) {
+            return false;
+        }
+        return this.components.equals(other.components);
     }
 
 }

@@ -5,6 +5,30 @@ from operator import add
 
 from pyspark import SparkContext
 
+def create_point(line):
+    point = line.split(",").astype(numpy.float)
+    
+    return point
+
+def map_function(point):
+    minDis = float("inf")
+
+    pointArr = numpy.array(point);
+
+    groupCentroid = [];
+
+    for centroid in centroidsVar.value:
+        centroidArr = numpy.array(centroid);
+        dis = numpy.linalg.norm(pointArr - centroidArr);
+        if dis < minDis:
+            minDis = dis;
+            groupCentroid = centroid;
+
+    return (groupCentroid, point);
+
+def reduce_function(centroid, point):
+    sum = 0;
+
 if __name__ == "__main__":
     if len(sys.argv) != 7:
         print("Usage: KMeans <input file (points)> <dimensions> <centroids> <Stop Criteria> <max iteration> [<output file>]", file=sys.stderr)
@@ -29,12 +53,14 @@ if __name__ == "__main__":
     
 
     lines = sc.textFile(inputFilePath)
-    points = lines.map(lambda x: x.split(",").astype(numpy.float))
+    # points = lines.map(lambda x: x.split(",").astype(numpy.float))
+    points = lines.flatMap(create_point)
     withReplacement = False                                             #Il campo withReplacement = False, specifica che non sono ammessi duplicati
     randomSeedValue = random.randrange(sys.maxsize)
     print("INFO | seed to select centroids = {randomSeedValue}")
     centroids = points.takeSample(withReplacement, numberOfCentroids, randomSeedValue)
-    sc.broadcast(centroids)                                             #Condivido in READ-ONLY i centroid per tutti i task spark
+    centroidsVar = sc.broadcast(centroids)                              #Condivido in READ-ONLY i centroid per tutti i task spark
+
     
     #words = lines.flatMap(lambda x: x.split(' '))
     #ones =  words.map(lambda x: (x, 1))

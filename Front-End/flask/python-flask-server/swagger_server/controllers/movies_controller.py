@@ -39,6 +39,7 @@ def add_movie(body):  # noqa: E501
 
     :rtype: None
     """
+
     connection = pika.BlockingConnection(pika.ConnectionParameters('172.16.3.35'))
     channelToBackEnd = connection.channel()
 
@@ -139,6 +140,7 @@ def get_movies(movieName=None, movieYear=None, director=None, genre=None):  # no
 
     :rtype: object
     """
+
     connection = pika.BlockingConnection(pika.ConnectionParameters('172.16.3.35'))
     channel = connection.channel()
 

@@ -40,17 +40,13 @@ paths:
         type: "string"
       responses:
         200:
-          description: "successful operation"
+          description: "It returns a list of all movies with filtered by the optionals parameters"
           schema:
             properties:
               movieList:
                 type: array
                 items:
                   $ref: "#/definitions/Movie"
-        400:
-          description: "Invalid name or year supplied"
-        404:
-          description: "Movie not found"
     put:
       tags:
       - "Movies"
@@ -70,13 +66,9 @@ paths:
           $ref: "#/definitions/Movie"
       responses:
         200:
-          description: "Movie update"
+          description: "Movie added or updated"
         400:
-          description: "Invalid ID supplied"
-        404:
-          description: "Movie not found"
-        405:
-          description: "Validation exception"
+          description: "Invalid fields provided"
     post:
       tags:
       - "Movies"
@@ -98,9 +90,7 @@ paths:
         200:
           description: "Movie added sucefully"
         400:
-          description: "Invalid input"
-        409:
-          description: "Movie alredy exists"
+          description: "Invalid fields provided"
 
     
 
@@ -166,6 +156,7 @@ definitions:
       id:
         type: "integer"
         format: "int64"
+        example: 1
       name:
         type: "string"
         example: "Avatar"

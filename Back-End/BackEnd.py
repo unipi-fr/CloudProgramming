@@ -3,9 +3,7 @@ import json
 import MySQLdb
 
 
-#da gestire meglio le connessioni e i cursori
-
-
+# TESTED
 def add_movie(movie):
     mydb = MySQLdb.connect(host="172.16.3.35", user="root", passwd="pisaflix", db="pisaflix")
 
@@ -17,125 +15,140 @@ def add_movie(movie):
     
     mydb.commit()
 
-# DA MODIFICARE PERCHé non è consistente con definizione yaml!!!!
-# I CAMPI SONO TUTTI REQUIRED!!!!!
+    result = mycursor.rowcount
+
+    mycursor.close()
+    mydb.close()
+
+    return '{ "rowcount" : ' + result + '}'
+
+# TESTED
 def update_movie(movie):
+    ''' it creates a movie if it doesn't exists, otherwise it updates it '''
     mydb = MySQLdb.connect(host="172.16.3.35", user="root", passwd="pisaflix", db="pisaflix")
 
     mycursor = mydb.cursor()
 
-    # depending on the values passed I add the attributes on the list
-    attribute_list = []
-    val = ()
-
-    if "name" in movie.keys():
-        attribute_list.append("name")
-        val = val + (movie["name"],)
-    if "description" in movie.keys():
-        attribute_list.append("description")
-        val = val + (movie["description"],)
-    if "director" in movie.keys():
-        attribute_list.append("director")
-        val = val + (movie["director"],)
-    if "year" in movie.keys():
-        attribute_list.append("year")
-        val = val + (movie["year"],)
-    if "genre" in movie.keys():
-        attribute_list.append("genre")
-        val = val + (movie["genre"],)
-
-    # I prepare the strings to be inserted the sql query
-    attribute_string = ",".join(attribute_list)
-    parameters_string = "%s,"*len(attribute_list)
-    # to remove the last ,
-    parameters_string = parameters_string[:-1]
-
-    sql = "UPDATE movies SET ("+ attribute_string +") VALUES ("+ parameters_string +") WHERE id = %s;" 
-    val = val + (movie["id"],) 
-
+    # Check if a movie with the specified id exists
+    sql = "SELECT id FROM movies WHERE id = %s"
+    val = (movie["id"], )
     mycursor.execute(sql, val)
+    myresult = mycursor.fetchone()
+
+    if myresult is not None:
+        #if it exists, I just update it
+        sql = "UPDATE movies SET name = %s, description = %s, director = %s, year = %s, genre = %s WHERE id = %s;" 
+        val = (movie["name"], movie["description"], movie["director"], movie["year"], movie["genre"], movie["id"])
+    else:
+        #otherwise I add it in the DB
+        sql = "INSERT INTO movies (name, description, director, year, genre) VALUES (%s, %s, %s, %s, %s)" 
+        val = (movie["name"], movie["description"], movie["director"], movie["year"], movie["genre"])
     
+    mycursor.execute(sql, val)
     mydb.commit()
 
-# PROBLEMA: MOVIE è UN DIZIONARIO VUOTO; RISOLVERE NEL FRONT END
+    result = mycursor.rowcount
+
+    mycursor.close()
+    mydb.close()
+    
+    return '{ "rowcount" : ' + result + '}'
+
+# TESTED
 def get_filtered(movie):
     mydb = MySQLdb.connect(host="172.16.3.35", user="root", passwd="pisaflix", db="pisaflix")
 
     mycursor = mydb.cursor()
-
-    # guardo cosa mi è stato passato
-
-    print(movie.keys())
-
-    if "name" in movie.keys() and "year" in movie.keys():
-        sql = "SELECT * FROM movies WHERE name = %s and year = %s" 
-        val = (movie["name"], movie["year"])
-        mycursor.execute(sql, val) 
-    elif "name" in movie.keys():
-        sql = "SELECT * FROM movies WHERE name = %s" 
-        val = (movie["name"], )
-        mycursor.execute(sql, val)
-    elif "year" in movie.keys():
-        sql = "SELECT * FROM movies WHERE year = %s" 
-        val = (movie["year"], )
-        mycursor.execute(sql, val) 
     
-
+    sql = "SELECT * FROM movies WHERE 1=1"
+    val = ()
+    if "name" in movie.keys():
+        sql = sql + " AND name = %s"
+        val = val + (movie["name"],)
+    if "year" in movie.keys():
+        sql = sql + " AND year = %s"
+        val = val + (movie["year"],)
+    if "director" in movie.keys():
+        sql = sql + " AND director = %s"
+        val = val + (movie["director"],)
+    if "genre" in movie.keys():
+        sql = sql + " AND genre = %s"
+        val = val + (movie["genre"],)
+    sql = sql + ";"
+    
+    mycursor.execute(sql, val) 
     mydb.commit()
+    movie_list = mycursor.fetchall()
+    mycursor.close()
+    mydb.close()
 
-    myresult = mycursor.fetchall()
+    listJson = json.dumps(movie_list) 
 
-    for x in myresult:
-        print(x)
+    result = '{ "movieList": ' + listJson + ' }'
 
-# DA TESTARE
+    print(result)
+    return result
+        
+# TESTED
 def delete_movie(id):
     mydb = MySQLdb.connect(host="172.16.3.35", user="root", passwd="pisaflix", db="pisaflix")
-
     mycursor = mydb.cursor()
 
     sql = "DELETE FROM movies WHERE id = %s"
     val = (id, )
 
     mycursor.execute(sql, val)
-
     mydb.commit()
 
-    print(mycursor.rowcount, "record(s) deleted") 
+    rowcount = mycursor.rowcount
+    print(rowcount, "record(s) deleted")
+
+    return '{ "rowcount" : ' + rowcount + '}'
     
-# DA TESTARE
+# TESTED
 def get_by_id(id):
     mydb = MySQLdb.connect(host="172.16.3.35", user="root", passwd="pisaflix", db="pisaflix")
-
     mycursor = mydb.cursor()
 
     sql = "SELECT * FROM movies WHERE id = %s"
     val = (id, )
 
     mycursor.execute(sql, val)
+    myresult = mycursor.fetchone()
+    mydb.commit()
+    mycursor.close()
+    mydb.close()
 
-    myresult = mycursor.fetchall()
+    result = "{}"
+    if myresult is not None:
+        result = json.dumps(myresult)
 
-    for x in myresult:
-        print(x) 
-
+    return result
 
 # Define a callback invoked every time a message is received
 def callback(ch, method, properties, body):
     print(" [x] %r:%r" % (method.routing_key, body))
-    
+    response = ""
+    queue_name = properties.headers["queue_name"]
+
     if method.routing_key == "add_movie":
-        add_movie(json.loads(body))
+        response = add_movie(json.loads(body))
     elif method.routing_key == "update_movie":
-        update_movie(json.loads(body))
+        response = update_movie(json.loads(body))
     elif method.routing_key == "get_filtered":
-        get_filtered(json.loads(body))
+        response = get_filtered(json.loads(body))
     elif method.routing_key == "delete_movie":
-        delete_movie(int(body))
+        response = delete_movie(int(body))
     elif method.routing_key == "get_by_id":
-        get_by_id(int(body))
+        response = get_by_id(int(body))
     else:
         print("Unknown method")
+
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host='172.16.3.35'))
+    channel = connection.channel()
+
+    channel.basic_publish(exchange='backend_to_frontend', routing_key=queue_name, body=response)
+    
 
 if __name__ == '__main__':
     # Connect to RabbitMQ
@@ -144,6 +157,7 @@ if __name__ == '__main__':
 
     # Connect to a queue
     channel.exchange_declare(exchange='frontend_to_backend', exchange_type='direct')
+    channel.exchange_declare(exchange='backend_to_frontend', exchange_type='direct')
 
     # I let the system to create the queue name
     result = channel.queue_declare(queue='', exclusive=True)

@@ -121,6 +121,10 @@ def get_movie_by_id(movieId):  # noqa: E501
 
     result = get_response_from_backend(connection, queue_name)
 
+    if json.dumps(result) == '{}':
+        return json.loads('{ "detail": "The movie was not found on the server. If you entered the URL manually please check your spelling and try again.","status": 404,"title": "Not Found","type": "about:blank"}'), 404
+        
+
     return result
 
 
@@ -172,6 +176,9 @@ def get_movies(movieName=None, movieYear=None, director=None, genre=None):  # no
         ))
 
     result = get_response_from_backend(connection, queue_name)
+
+    if json.dumps(result) == '{ "movieList": [] }':
+        return json.loads('{ "detail": "The movie was not found on the server. If you entered the URL manually please check your spelling and try again.","status": 404,"title": "Not Found","type": "about:blank"}'), 404
 
     return result
 

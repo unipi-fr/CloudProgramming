@@ -3,22 +3,35 @@ import six
 import pika
 import json
 from django.utils.crypto import get_random_string
+from kazoo.client import KazooClient
 
 from swagger_server.models.movie import Movie  # noqa: E501
 from swagger_server import util
 
+def zookeeperRetrieve(path):
+    zk = KazooClient(hosts='172.16.3.35:2181')
+    zk.start()
+ 
+    children = zk.get("/" + path)
+    zk.stop()
+ 
+    return children[0].decode("utf-8")
+
 def get_response_from_backend(connection, queue_name):
     channelFromBackEnd = connection.channel()
 
-    channelFromBackEnd.exchange_declare(exchange='backend_to_frontend', exchange_type='direct')
+    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/back_to_front1")
+
+    channelFromBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     channelFromBackEnd.queue_declare(queue=queue_name, exclusive=True)
-    channelFromBackEnd.queue_bind(exchange='backend_to_frontend', queue=queue_name, routing_key=queue_name)
+    channelFromBackEnd.queue_bind(exchange=exchange, queue=queue_name, routing_key=queue_name)
     
     channelFromBackEnd.basic_qos(prefetch_count=1)
     method_frame, header_frame, body = channelFromBackEnd.basic_get(queue_name)
 
     while method_frame is None:
+        print("Cycling")
         method_frame, header_frame, body = channelFromBackEnd.basic_get(queue_name)
 
     if method_frame:
@@ -40,19 +53,23 @@ def add_movie(body):  # noqa: E501
     :rtype: None
     """
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('172.16.3.35'))
+    address = zookeeperRetrieve("RabbitMQ/address")
+    connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
 
-    channelToBackEnd.exchange_declare(exchange='frontend_to_backend', exchange_type='direct')
+    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     if connexion.request.is_json:
         body = connexion.request.get_json()  # noqa: E501
 
-    queue_name = get_random_string(8)
+    numBytes = int(zookeeperRetrieve("Utils/string_dim"))
+    queue_name = get_random_string(numBytes)
 
+    routing_key = zookeeperRetrieve("Utils/Routing_keys/addMovie")
     channelToBackEnd.basic_publish(
-        exchange='frontend_to_backend', 
-        routing_key='add_movie', 
+        exchange=exchange, 
+        routing_key=routing_key, 
         body=json.dumps(body), 
         properties=pika.BasicProperties(
             headers={'queue_name': queue_name}
@@ -73,16 +90,20 @@ def delete_movie(movieId):  # noqa: E501
     :rtype: None
     """
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('172.16.3.35'))
-    channel = connection.channel()
+    address = zookeeperRetrieve("RabbitMQ/address")
+    connection = pika.BlockingConnection(pika.ConnectionParameters(address))
+    channelToBackEnd = connection.channel()
 
-    channel.exchange_declare(exchange='frontend_to_backend', exchange_type='direct')
+    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
-    queue_name = get_random_string(8)
+    numBytes = int(zookeeperRetrieve("Utils/string_dim"))
+    queue_name = get_random_string(numBytes)
 
-    channel.basic_publish(
-        exchange='frontend_to_backend', 
-        routing_key='delete_movie', 
+    routing_key = zookeeperRetrieve("Utils/Routing_keys/deleteMovie")
+    channelToBackEnd.basic_publish(
+        exchange=exchange, 
+        routing_key=routing_key, 
         body=str(movieId), 
         properties=pika.BasicProperties(
             headers={'queue_name': queue_name}
@@ -104,16 +125,20 @@ def get_movie_by_id(movieId):  # noqa: E501
     :rtype: Movie
     """
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('172.16.3.35'))
-    channel = connection.channel()
+    address = zookeeperRetrieve("RabbitMQ/address")
+    connection = pika.BlockingConnection(pika.ConnectionParameters(address))
+    channelToBackEnd = connection.channel()
 
-    channel.exchange_declare(exchange='frontend_to_backend', exchange_type='direct')
+    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
-    queue_name = get_random_string(8)
+    numBytes = int(zookeeperRetrieve("Utils/string_dim"))
+    queue_name = get_random_string(numBytes)
 
-    channel.basic_publish(
-        exchange='frontend_to_backend', 
-        routing_key='get_by_id', 
+    routing_key = zookeeperRetrieve("Utils/Routing_keys/getById")
+    channelToBackEnd.basic_publish(
+        exchange=exchange, 
+        routing_key=routing_key, 
         body=str(movieId), 
         properties=pika.BasicProperties(
             headers={'queue_name': queue_name}
@@ -145,10 +170,12 @@ def get_movies(movieName=None, movieYear=None, director=None, genre=None):  # no
     :rtype: object
     """
 
-    connection = pika.BlockingConnection(pika.ConnectionParameters('172.16.3.35'))
-    channel = connection.channel()
+    address = zookeeperRetrieve("RabbitMQ/address")
+    connection = pika.BlockingConnection(pika.ConnectionParameters(address))
+    channelToBackEnd = connection.channel()
 
-    channel.exchange_declare(exchange='frontend_to_backend', exchange_type='direct')
+    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     jsonString = "{"
 
@@ -165,11 +192,13 @@ def get_movies(movieName=None, movieYear=None, director=None, genre=None):  # no
 
     jsonString += "}"
 
-    queue_name = get_random_string(8)
+    numBytes = int(zookeeperRetrieve("Utils/string_dim"))
+    queue_name = get_random_string(numBytes)
 
-    channel.basic_publish(
-        exchange='frontend_to_backend', 
-        routing_key='get_filtered', 
+    routing_key = zookeeperRetrieve("Utils/Routing_keys/getFilteredMovies")
+    channelToBackEnd.basic_publish(
+        exchange=exchange, 
+        routing_key=routing_key, 
         body = jsonString, 
         properties=pika.BasicProperties(
             headers={'queue_name': queue_name}
@@ -193,19 +222,23 @@ def update_movie(body):  # noqa: E501
 
     :rtype: None
     """
-    connection = pika.BlockingConnection(pika.ConnectionParameters('172.16.3.35'))
-    channel = connection.channel()
+    address = zookeeperRetrieve("RabbitMQ/address")
+    connection = pika.BlockingConnection(pika.ConnectionParameters(address))
+    channelToBackEnd = connection.channel()
 
-    channel.exchange_declare(exchange='frontend_to_backend', exchange_type='direct')
+    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     if connexion.request.is_json:
         body = connexion.request.get_json()  # noqa: E501
 
-    queue_name = get_random_string(8)
+    numBytes = int(zookeeperRetrieve("Utils/string_dim"))
+    queue_name = get_random_string(numBytes)
 
-    channel.basic_publish(
-        exchange='frontend_to_backend', 
-        routing_key='update_movie', 
+    routing_key = zookeeperRetrieve("Utils/Routing_keys/updateMovie")
+    channelToBackEnd.basic_publish(
+        exchange=exchange, 
+        routing_key=routing_key, 
         body=json.dumps(body), 
         properties=pika.BasicProperties(
             headers={'queue_name': queue_name}

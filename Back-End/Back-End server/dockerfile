@@ -1,0 +1,5 @@
+FROM back-end-server-base
+
+COPY BackEnd.py /usr/src/app
+ENTRYPOINT ["python3"]
+CMD ["BackEnd.py"]

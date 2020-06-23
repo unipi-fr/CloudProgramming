@@ -1,88 +1,140 @@
 import sys
-import numpy as np
 import random
-from operator import add
-
+import numpy as np
+import time
 from pyspark import SparkContext
 
-def create_point(line):
+def createPoint(line):
+    # Prende in ingresso una linea del file di input e la trasforma in un numpy array di float
     lineSplit = line.split(",")
     point = np.array(lineSplit).astype(np.float)
     return point
 
-def map_function(point):
-    minDis = float("inf")
-    pointArr = np.array(point)
-    groupCentroid = []
+def mapFunction(line):
+    # Prende in ingresso un punto e calcola la distanza tra esso e i vari centroidi, trovando quello più vicino
+    point = createPoint(line)
+    minDistance = float("inf")
+    nearestCentroidIndex = 0
     index = 0
-    for centroid in centroidsVar.value:
-        centroidArr = np.array(centroid)
-        dis = np.linalg.norm(pointArr - centroidArr)
-        if dis < minDis:
-            minDis = dis
-            groupCentroid = index
+    # broadcastCentroids contiene la lista dei centroidi al passo precedente
+    for centroid in broadcastCentroids.value:
+        distance = np.linalg.norm(point - centroid)
+        if distance < minDistance:
+            minDistance = distance
+            nearestCentroidIndex = index
         index += 1
-    return (groupCentroid, point)
+    # Restituisce l'indice del centroide più vicino e il punto associato
+    return (nearestCentroidIndex, point)
 
 def createCombiner(point):
+    # Affianca un uno ad ogni punto per calcolare la somma
     return (point, 1)
     
-def mergeValue(partial_sum, point):
-    return (partial_sum[0] + point, partial_sum[1] + 1)
+def mergeValue(partialSum, point): 
+    # Somma i punti all'accumulatore
+    return (partialSum[0] + point[0], partialSum[1] + 1)
     
-def mergeCombiner(partial_sum1, partial_sum2):
-    return (partial_sum1[0] + partial_sum2[0], partial_sum1[1] + partial_sum2[1])
+def mergeCombiner(partialSum1, partialSum2): 
+    # Esegue il merge delle somme parziali 
+    return (partialSum1[0] + partialSum2[0], partialSum1[1] + partialSum2[1])
 
+def totalDistanceOldNewCentroid(oldCentroids, newCentroids):
+    # Somma le distanze tra i punti delle due liste
+    totalDistance = 0.0
+    for i in range(0,len(oldCentroids)):
+        distance = np.linalg.norm(oldCentroids[i] - newCentroids[i])
+        totalDistance += distance
+    return totalDistance
 
 if __name__ == "__main__":
+
+    # Tempo a inizio esecuzione
+    startTime = time.time()
+    oldTime = startTime
+
+    # Assegnazione argomenti
     if len(sys.argv) != 7:
         print("Usage: KMeans <input file (points)> <dimensions> <centroids> <Stop Criteria> <max iteration> [<output file>]", file=sys.stderr)
         sys.exit(-1)
+
     inputFilePath = sys.argv[1]
-    pointsDimension = sys.argv[2]
-    numberOfCentroids = sys.argv[3]
-    stopCriteria = sys.argv[4]
-    maxIterations = sys.argv[5]
+    pointsDimensions = int(sys.argv[2])
+    numberOfCentroids = int(sys.argv[3])
+    # Margine di differenza tra i centroidi di due iterazioni consecutive sotto il quale stoppare l'algoritmo
+    stopCriteriaMargin = float(sys.argv[4])
+    maxIterations = int(sys.argv[5])
     outputPath = sys.argv[6]
 
-        # Print degli argomenti da riga di comando
-    print("INFO | args[0]: <input points> = {inputFilePath}")           #File di input
-    print("INFO | args[1]: <d> = {pointsDimension}")                    # Numero componenti per punto
-    print("INFO | args[2]: <k> = {numberOfCentroids}")                  # Numero centroidi => numero cluster
-    print("INFO | args[3]: Stop Criteria = {stopCriteria}")
-    print("INFO | args[4]: <max_iterations> = {maxIterations}")
-    print("INFO | args[5]: <output file (centroids)> = {outputPath}")   # Cartella di output
+    # Stampa degli argomenti su riga di comando
+    print("INFO | args[0]: <input points> = "+ str(inputFilePath))           # File di input
+    print("INFO | args[1]: <d> = "+ str(pointsDimensions))                   # Numero componenti per punto
+    print("INFO | args[2]: <k> = "+ str(numberOfCentroids))                  # Numero centroidi = numero cluster
+    print("INFO | args[3]: Stop Criteria = "+ str(stopCriteriaMargin))       # Margine per il criterio di stop    
+    print("INFO | args[4]: <max_iterations> = "+ str(maxIterations))         # Numero massimo di iterazioni consentite
+    print("INFO | args[5]: <output file (centroids)> = "+ str(outputPath))   # Cartella di output
 
     master = "yarn"
     sc = SparkContext(master, "KMeans")
+
+    # Sopprime i log
+    sc.setLogLevel("ERROR")
+
+    # Caricamento del file di input nel contesto
+    inputLines = sc.textFile(inputFilePath)
+
+    # Campionamento casueale dei centroidi, senza rimpiazzo
+    centroidsLines = inputLines.takeSample(withReplacement = False, num = numberOfCentroids, seed = random.randrange(sys.maxsize))
+
+    # Conversione dei centroidi in punti 
+    oldCentroids = [createPoint(line) for line in centroidsLines]
+
+    # Broadcast in READ-ONLY dei centroid per tutti i task spark
+    broadcastCentroids = sc.broadcast(oldCentroids) 
+    # Margine di movimento dei centroidi dal passo precedente
+    centroidsMovementMargin = sys.maxsize
+
+    # Iterazioni dell'algoritmo
+    for iteration in range(0, maxIterations):
+
+        print("INFO | Starts of iteration " + str(iteration) + " ...")
+
+        # Assegnazione punti al centroide più vicino
+        mappedPoints = inputLines.map(mapFunction)
+
+        # Calcolo delle somme parziali e poi totali dei punti assegnati ai centroidi
+        combinedPoints = mappedPoints.combineByKey(createCombiner, mergeValue, mergeCombiner)
+
+        # I componenti delle somme totali (x[1][0]) vengono divisi per il numero di punti sommati (x[1][1])
+        # "new_centroid" i nuovi valori delle componenti dei centroidi e i relativi indici (x[0])
+        indexesAndCentroids = combinedPoints.map(lambda x:(x[0],x[1][0]/x[1][1]))
+        
+        # Riordina i centroidi per effettuare il confronto
+        newCentroids = []
+        for indexAndCentroid in indexesAndCentroids.collect():
+            newCentroids.insert(indexAndCentroid[0],indexAndCentroid[1])
+
+        print("INFO | Old centroids: " + str(oldCentroids))
+        print("INFO | New centroids: " + str(newCentroids))
+
+        # Calcolo del margine di spostamento da un'iterazione all'altra
+        centroidsMovementMargin = totalDistanceOldNewCentroid(oldCentroids, newCentroids)
+        print("INFO | Movement margin = " + str(centroidsMovementMargin))
+
+        newTime = time.time()
+        print("INFO | End iteration " + str(iteration) + " in " + str(newTime - oldTime) + " seconds from previous one")
+        print("INFO | End iteration " + str(iteration) + " at " + str(newTime - startTime) + " seconds from start")
+        oldTime = newTime
+        
+        # Uscita dal ciclo in caso del superamento del margine
+        if centroidsMovementMargin <= stopCriteriaMargin:
+            break
+ 
+        # Broadcast dei nuovi centroidi
+        broadcastCentroids = sc.broadcast(newCentroids)
+        oldCentroids = newCentroids
+
+        iteration+=1
     
-
-    lines = sc.textFile(inputFilePath)
-
-    print(lines.take(100))
-
-    # points = lines.map(lambda x: x.split(",").astype(numpy.float))
-    points = lines.map(create_point)
-
-    print(points.take(100))
-
-    withReplacement = False                                             #Il campo withReplacement = False, specifica che non sono ammessi duplicati
-    randomSeedValue = random.randrange(sys.maxsize)
-    print("INFO | seed to select centroids = {randomSeedValue}")
-    centroids = points.takeSample(withReplacement, numberOfCentroids, randomSeedValue)
-    centroidsVar = sc.broadcast(centroids)                              #Condivido in READ-ONLY i centroid per tutti i task spark
-
-    mapped_points = points.map(map_function)
-    combined_points = mapped_points.combineByKey(createCombiner, mergeValue, mergeCombiner)
-    new_centroids = combined_points.map(lambda x:(x[0],x[1][0]/x[1][1]))
-    
-    #words = lines.flatMap(lambda x: x.split(' '))
-    #ones =  words.map(lambda x: (x, 1))
-    #counts = ones.reduceByKey(add)
-
-    #if len(sys.argv) == 3:
-    #    counts.repartition(1).saveAsTextFile(sys.argv[2])
-    #else:
-    #    output = counts.collect()
-    #    for (word, count) in output:
-    #        print("%s: %i" % (word, count))
+    print("INFO | Stop iterations at " + str(time.time() - startTime) + " seconds from start")
+    print("INFO | Results: " + str(newCentroids))
+    indexesAndCentroids.saveAsTextFile(outputPath)

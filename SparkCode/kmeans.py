@@ -82,7 +82,7 @@ if __name__ == "__main__":
     # Caricamento del file di input nel contesto
     inputLines = sc.textFile(inputFilePath)
 
-    # Campionamento casueale dei centroidi, senza rimpiazzo
+    # Campionamento casuale dei centroidi, senza rimpiazzo
     centroidsLines = inputLines.takeSample(withReplacement = False, num = numberOfCentroids, seed = random.randrange(sys.maxsize))
 
     # Conversione dei centroidi in punti 
@@ -109,9 +109,10 @@ if __name__ == "__main__":
         indexesAndCentroids = combinedPoints.map(lambda x:(x[0],x[1][0]/x[1][1]))
         
         # Riordina i centroidi per effettuare il confronto
-        newCentroids = []
+        newCentroids = [centroid for centroid in oldCentroids]
         for indexAndCentroid in indexesAndCentroids.collect():
-            newCentroids.insert(indexAndCentroid[0],indexAndCentroid[1])
+            newCentroids[indexAndCentroid[0]] = indexAndCentroid[1]
+
 
         print("INFO | Old centroids: " + str(oldCentroids))
         print("INFO | New centroids: " + str(newCentroids))

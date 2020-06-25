@@ -7,6 +7,9 @@ from pyspark import SparkContext
 def createPoint(line):
     # Prende in ingresso una linea del file di input e la trasforma in un numpy array di float
     lineSplit = line.split(",")
+    # Controllo correttezza punti
+    if len(lineSplit) != pointsDimensions:
+        raise ValueError("Wrong Point Dimension")
     point = np.array(lineSplit).astype(np.float)
     return point
 
@@ -27,15 +30,16 @@ def mapFunction(line):
     return (nearestCentroidIndex, point)
 
 def createCombiner(point):
-    # Affianca un uno ad ogni punto per calcolare la somma
+    # Crea il primo valore degli accumulatori (somme parziali)
+    # il valore affiancato permette di tener conto dei punti sommati
     return (point, 1)
     
 def mergeValue(partialSum, point): 
-    # Somma i punti all'accumulatore
-    return (partialSum[0] + point[0], partialSum[1] + 1)
+    # Somma un SUBSET di punti ad un accumulatore 
+    return (partialSum[0] + point, partialSum[1] + 1)
     
 def mergeCombiner(partialSum1, partialSum2): 
-    # Esegue il merge delle somme parziali 
+    # Esegue il merge delle somme parziali (unisce i subset in un'unica somma totale per centroide)
     return (partialSum1[0] + partialSum2[0], partialSum1[1] + partialSum2[1])
 
 def totalDistanceOldNewCentroid(oldCentroids, newCentroids):
@@ -89,7 +93,7 @@ if __name__ == "__main__":
     oldCentroids = [createPoint(line) for line in centroidsLines]
 
     # Broadcast in READ-ONLY dei centroid per tutti i task spark
-    broadcastCentroids = sc.broadcast(oldCentroids) 
+    broadcastCentroids = sc.broadcast(oldCentroids)
     # Margine di movimento dei centroidi dal passo precedente
     centroidsMovementMargin = sys.maxsize
 
@@ -108,14 +112,20 @@ if __name__ == "__main__":
         # "new_centroid" i nuovi valori delle componenti dei centroidi e i relativi indici (x[0])
         indexesAndCentroids = combinedPoints.map(lambda x:(x[0],x[1][0]/x[1][1]))
         
-        # Riordina i centroidi per effettuare il confronto
+        # La copia serve per evitare che si perdano centroidi 
+        # non arrivati al combiner perchè non aventi punti associati
         newCentroids = [centroid for centroid in oldCentroids]
+        # Riordina i centroidi per effettuare il confronto
         for indexAndCentroid in indexesAndCentroids.collect():
             newCentroids[indexAndCentroid[0]] = indexAndCentroid[1]
 
+        # print("INFO | Old centroids: " + str(oldCentroids))
+        # print("INFO | New centroids: " + str(newCentroids))
 
-        print("INFO | Old centroids: " + str(oldCentroids))
-        print("INFO | New centroids: " + str(newCentroids))
+        # stampa dei punti per controllare la corretta esecuzione
+        for i in range(0,len(oldCentroids)):
+            print("INFO | Old centroid: " + str(oldCentroids[i]))
+            print("INFO | New centroid: " + str(newCentroids[i]))
 
         # Calcolo del margine di spostamento da un'iterazione all'altra
         centroidsMovementMargin = totalDistanceOldNewCentroid(oldCentroids, newCentroids)
@@ -131,6 +141,7 @@ if __name__ == "__main__":
             break
  
         # Broadcast dei nuovi centroidi
+        broadcastCentroids.destroy()
         broadcastCentroids = sc.broadcast(newCentroids)
         oldCentroids = newCentroids
 

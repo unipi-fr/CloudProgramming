@@ -8,6 +8,8 @@ from kazoo.client import KazooClient
 from swagger_server.models.movie import Movie  # noqa: E501
 from swagger_server import util
 
+responseFromCallBack = {} 
+
 def zookeeperRetrieve(path):
     zk = KazooClient(hosts='172.16.3.35:2181')
     zk.start()
@@ -16,6 +18,13 @@ def zookeeperRetrieve(path):
     zk.stop()
  
     return children[0].decode("utf-8")
+
+def get_response_from_backend_callback(ch, method, properties, body):
+    queue_name = method.routing_key
+    responseFromCallBack[queue_name] = body
+    ch.queue_delete(queue_name)
+    ch.stop_consuming()
+
 
 def get_response_from_backend(connection, queue_name):
     channelFromBackEnd = connection.channel()
@@ -27,20 +36,28 @@ def get_response_from_backend(connection, queue_name):
     channelFromBackEnd.queue_declare(queue=queue_name, exclusive=True)
     channelFromBackEnd.queue_bind(exchange=exchange, queue=queue_name, routing_key=queue_name)
     
-    channelFromBackEnd.basic_qos(prefetch_count=1)
-    method_frame, header_frame, body = channelFromBackEnd.basic_get(queue_name)
+    #channelFromBackEnd.basic_qos(prefetch_count=1)
+    #method_frame, header_frame, body = channelFromBackEnd.basic_get(queue_name)
 
-    while method_frame is None:
-        print("Cycling")
-        method_frame, header_frame, body = channelFromBackEnd.basic_get(queue_name)
+    #while method_frame is None:
+    #    print("Cycling")
+    #    method_frame, header_frame, body = channelFromBackEnd.basic_get(queue_name)
 
-    if method_frame:
-        print(method_frame, header_frame, body)
-        channelFromBackEnd.basic_ack(method_frame.delivery_tag)
+    #if method_frame:
+    #    print(method_frame, header_frame, body)
+    #   channelFromBackEnd.basic_ack(method_frame.delivery_tag)
 
-    channelFromBackEnd.queue_delete(queue_name)
+    channelFromBackEnd.queue_bind(exchange=exchange, queue=queue_name, routing_key=queue_name)
+        
+    channelFromBackEnd.basic_consume(
+        queue=queue_name, on_message_callback=get_response_from_backend_callback, auto_ack=True)
+    channelFromBackEnd.start_consuming()
 
-    return json.loads(body)
+    # channelFromBackEnd.queue_delete(queue_name)
+    result = responseFromCallBack[queue_name]
+    del responseFromCallBack[queue_name]
+    
+    return json.loads(result)
 
 def add_movie(body):  # noqa: E501
     """Add a new movie
@@ -205,9 +222,6 @@ def get_movies(movieName=None, movieYear=None, director=None, genre=None):  # no
         ))
 
     result = get_response_from_backend(connection, queue_name)
-
-    if json.dumps(result) == '{ "movieList": [] }':
-        return json.loads('{ "detail": "The movie was not found on the server. If you entered the URL manually please check your spelling and try again.","status": 404,"title": "Not Found","type": "about:blank"}'), 404
 
     return result
 

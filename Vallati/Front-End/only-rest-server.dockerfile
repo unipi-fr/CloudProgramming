@@ -1,5 +1,5 @@
 FROM custom-base-flask-server
-COPY . /usr/src/app
+COPY python-flask-server /usr/src/app
 
 EXPOSE 8080
 

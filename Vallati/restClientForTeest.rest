@@ -1,0 +1,18 @@
+GET https://example.com/comments/1 HTTP/1.1
+
+###
+
+GET http://172.16.1.121:8080/movies HTTP/1.1
+
+###
+
+POST http://172.16.1.121:8080/movies HTTP/1.1
+content-type: application/json
+
+{
+  "name": "Avatar",
+  "year": "2009",
+  "director": "James Cameron",
+  "genre": "action",
+  "description": "A paraplegic Marine dispatched to the moon Pandora on a unique mission becomes torn between following his orders and protecting the world he feels is his home."
+}

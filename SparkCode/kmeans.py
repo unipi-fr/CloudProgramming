@@ -42,7 +42,7 @@ def mergeCombiner(partialSum1, partialSum2):
     # Esegue il merge delle somme parziali (unisce i subset in un'unica somma totale per centroide)
     return (partialSum1[0] + partialSum2[0], partialSum1[1] + partialSum2[1])
 
-def totalDistanceOldNewCentroid(oldCentroids, newCentroids):
+def totalDistanceOldNewCentroids(oldCentroids, newCentroids):
     # Somma le distanze tra i punti delle due liste
     totalDistance = 0.0
     for i in range(0,len(oldCentroids)):
@@ -128,7 +128,7 @@ if __name__ == "__main__":
             print("INFO | New centroid: " + str(newCentroids[i]))
 
         # Calcolo del margine di spostamento da un'iterazione all'altra
-        centroidsMovementMargin = totalDistanceOldNewCentroid(oldCentroids, newCentroids)
+        centroidsMovementMargin = totalDistanceOldNewCentroids(oldCentroids, newCentroids)
         print("INFO | Movement margin = " + str(centroidsMovementMargin))
 
         newTime = time.time()
@@ -144,8 +144,6 @@ if __name__ == "__main__":
         broadcastCentroids.destroy()
         broadcastCentroids = sc.broadcast(newCentroids)
         oldCentroids = newCentroids
-
-        iteration+=1
     
     print("INFO | Stop iterations at " + str(time.time() - startTime) + " seconds from start")
     print("INFO | Results: " + str(newCentroids))

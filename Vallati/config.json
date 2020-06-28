@@ -13,12 +13,24 @@
             "exchange":"exchange1",
             "ssh-user":"root",
             "ssh-password":"hal9000"
+        },
+        {
+            "ip":"172.16.1.120",
+            "exchange":"exchange2",
+            "ssh-user":"root",
+            "ssh-password":"hal9000"
         }
     ],
     "back-end-machines":[
         {
             "ip":"172.16.1.242",
             "exchange":"exchange1",
+            "ssh-user":"root",
+            "ssh-password":"hal9000"
+        },
+        {
+            "ip":"172.16.1.213",
+            "exchange":"exchange2",
             "ssh-user":"root",
             "ssh-password":"hal9000"
         }

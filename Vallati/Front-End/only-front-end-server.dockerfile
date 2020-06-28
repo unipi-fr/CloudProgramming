@@ -1,4 +1,4 @@
-FROM custom-base-flask-server
+FROM front-end-base-server
 COPY front-end-server /usr/src/app
 
 EXPOSE 8080

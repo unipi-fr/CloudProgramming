@@ -1,5 +1,11 @@
 {
-    "version":"1.0",
+    "version":"1.1",
+    "clean-front-end-container": true,
+    "clean-back-end-container": true,
+    "clean-front-end-image": true,
+    "clean-back-end-image": true,
+    "clean-base-front-end-image": false,
+    "clean-base-back-end-image": false,
     "zookeper-ip":"172.16.3.35",
     "front-end-machines":[
         {

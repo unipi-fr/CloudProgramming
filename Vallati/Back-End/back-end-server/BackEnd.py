@@ -3,9 +3,15 @@ import json
 import MySQLdb
 from kazoo.client import KazooClient
 
-def zookeeperRetrieve(path):
+def getConfig():
+    config = {}
+    with open('config.json') as f:
+        config = json.load(f)
+    return config
 
-    zk = KazooClient(hosts='172.16.3.35:2181')
+def zookeeperRetrieve(path):
+    config = getConfig()
+    zk = KazooClient(hosts=config["zookeper-ip"]+':2181')
     zk.start()
 
     children = zk.get("/" + path)
@@ -29,15 +35,18 @@ def add_movie(movie):
     sql = "INSERT INTO movies (name, description, director, year, genre) VALUES (%s, %s, %s, %s, %s)" 
     val = (movie["name"], movie["description"], movie["director"], movie["year"], movie["genre"]) 
     mycursor.execute(sql, val) 
-    
+    sql = "SELECT LAST_INSERT_ID() as id"
+    mycursor.execute(sql)
+    myresult = mycursor.fetchone()
+
     mydb.commit()
-
-    result = mycursor.rowcount
-
+    #result = mycursor.rowcount
     mycursor.close()
     mydb.close()
 
-    return '{ "rowcount" : ' + result + '}'
+    if myresult is not None:
+        return json.dumps(myresult)
+    return "{}"
 
 # TESTED
 def update_movie(movie):
@@ -176,7 +185,8 @@ def callback(ch, method, properties, body):
     r_k_delete = zookeeperRetrieve("Utils/Routing_keys/deleteMovie")
     r_k_get_by_id = zookeeperRetrieve("Utils/Routing_keys/getById")
     rabbitMQ_address = zookeeperRetrieve("RabbitMQ/address")
-    e_back_to_front = zookeeperRetrieve("RabbitMQ/Exchange_names/back_to_front1")
+    config = getConfig()
+    exchange = config["exchange"]
 
     if method.routing_key == r_k_add:
         response = add_movie(json.loads(body))
@@ -194,7 +204,7 @@ def callback(ch, method, properties, body):
     connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitMQ_address))
     channel = connection.channel()
 
-    channel.basic_publish(exchange=e_back_to_front, routing_key=queue_name, body=response)
+    channel.basic_publish(exchange=exchange, routing_key=queue_name, body=response)
     
 # SAREBBE MEGLIO UNA CONNESSIONE GLOBALE ????
 if __name__ == '__main__':
@@ -203,11 +213,10 @@ if __name__ == '__main__':
     connection = pika.BlockingConnection(pika.ConnectionParameters(host=rabbitMQ_address))
     channel = connection.channel()
 
-    e_front_to_back = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
-    e_back_to_front = zookeeperRetrieve("RabbitMQ/Exchange_names/back_to_front1")
+    config = getConfig()
+    exchange = config["exchange"]
     # Connect to a queue
-    channel.exchange_declare(exchange=e_front_to_back, exchange_type='direct')
-    channel.exchange_declare(exchange=e_back_to_front, exchange_type='direct')
+    channel.exchange_declare(exchange=exchange, exchange_type='direct')
 
     # I let the system to create the queue name
     result = channel.queue_declare(queue='', exclusive=True)
@@ -221,11 +230,11 @@ if __name__ == '__main__':
 
 
     # Bind the queue to one or more keys/exchanges (it can be done at runtime)
-    channel.queue_bind(exchange=e_front_to_back, queue=queue_name, routing_key=r_k_add)
-    channel.queue_bind(exchange=e_front_to_back, queue=queue_name, routing_key=r_k_update)
-    channel.queue_bind(exchange=e_front_to_back, queue=queue_name, routing_key=r_k_get_f)
-    channel.queue_bind(exchange=e_front_to_back, queue=queue_name, routing_key=r_k_delete)
-    channel.queue_bind(exchange=e_front_to_back, queue=queue_name, routing_key=r_k_get_by_id)
+    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_add)
+    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_update)
+    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_get_f)
+    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_delete)
+    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_get_by_id)
         
     channel.basic_consume(
         queue=queue_name, on_message_callback=callback, auto_ack=True)

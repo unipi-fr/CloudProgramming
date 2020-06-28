@@ -8,10 +8,21 @@ from kazoo.client import KazooClient
 from swagger_server.models.movie import Movie  # noqa: E501
 from swagger_server import util
 
-responseFromCallBack = {} 
+responseFromCallBack = {}
+
+def log(message):
+    with open("front-end.log", "a") as myfile:
+        myfile.write(message+"\n")
+
+def getConfig():
+    config = {}
+    with open('config.json') as f:
+        config = json.load(f)
+    return config
 
 def zookeeperRetrieve(path):
-    zk = KazooClient(hosts='172.16.3.35:2181')
+    config = getConfig()
+    zk = KazooClient(hosts=config["zookeper-ip"]+':2181')
     zk.start()
  
     children = zk.get("/" + path)
@@ -21,43 +32,32 @@ def zookeeperRetrieve(path):
 
 def get_response_from_backend_callback(ch, method, properties, body):
     queue_name = method.routing_key
-    responseFromCallBack[queue_name] = body
-    ch.queue_delete(queue_name)
+    responseFromCallBack[queue_name] = json.loads(body)
+    
     ch.stop_consuming()
 
 
 def get_response_from_backend(connection, queue_name):
+    config = getConfig()
     channelFromBackEnd = connection.channel()
 
-    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/back_to_front1")
+    exchange = config["exchange"]
 
     channelFromBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     channelFromBackEnd.queue_declare(queue=queue_name, exclusive=True)
-    channelFromBackEnd.queue_bind(exchange=exchange, queue=queue_name, routing_key=queue_name)
-    
-    #channelFromBackEnd.basic_qos(prefetch_count=1)
-    #method_frame, header_frame, body = channelFromBackEnd.basic_get(queue_name)
-
-    #while method_frame is None:
-    #    print("Cycling")
-    #    method_frame, header_frame, body = channelFromBackEnd.basic_get(queue_name)
-
-    #if method_frame:
-    #    print(method_frame, header_frame, body)
-    #   channelFromBackEnd.basic_ack(method_frame.delivery_tag)
 
     channelFromBackEnd.queue_bind(exchange=exchange, queue=queue_name, routing_key=queue_name)
         
-    channelFromBackEnd.basic_consume(
-        queue=queue_name, on_message_callback=get_response_from_backend_callback, auto_ack=True)
+    channelFromBackEnd.basic_consume(queue=queue_name, on_message_callback=get_response_from_backend_callback, auto_ack=True)
     channelFromBackEnd.start_consuming()
 
-    # channelFromBackEnd.queue_delete(queue_name)
+    channelFromBackEnd.queue_delete(queue_name)
+
     result = responseFromCallBack[queue_name]
     del responseFromCallBack[queue_name]
     
-    return json.loads(result)
+    return result
 
 def add_movie(body):  # noqa: E501
     """Add a new movie
@@ -69,12 +69,13 @@ def add_movie(body):  # noqa: E501
 
     :rtype: None
     """
-
+    config = getConfig()
     address = zookeeperRetrieve("RabbitMQ/address")
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
 
-    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    exchange = config["exchange"]
+    #exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     if connexion.request.is_json:
@@ -106,12 +107,13 @@ def delete_movie(movieId):  # noqa: E501
 
     :rtype: None
     """
-
+    config = getConfig()
     address = zookeeperRetrieve("RabbitMQ/address")
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
 
-    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    exchange = config["exchange"]
+    #exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
@@ -186,28 +188,27 @@ def get_movies(movieName=None, movieYear=None, director=None, genre=None):  # no
 
     :rtype: object
     """
-
+    config = getConfig()
     address = zookeeperRetrieve("RabbitMQ/address")
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
 
-    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    exchange = config["exchange"]
+    #exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
-    jsonString = "{"
+    filters = {}
 
     if movieName != None:
-        jsonString += '"name" : "' + movieName + '",'
+        filters["name"] = movieName
     if movieYear != None:
-        jsonString += '"year" : ' + str(movieYear) + ","
+        filters["year"] = movieYear
     if director != None:
-        jsonString += '"director" : "' + director + '",'
+        filters["director"] = director
     if genre != None:
-        jsonString += '"genre" : "' + genre + '",'
+        filters["genre"] = genre
 
-    jsonString = jsonString[:-1]
-
-    jsonString += "}"
+    jsonString = json.dumps(filters)
 
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)

@@ -79,7 +79,7 @@ def add_movie(body):  # noqa: E501
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     if connexion.request.is_json:
-        body = MovieData.from_dict(connexion.request.get_json())  # noqa: E501
+        body = connexion.request.get_json() # noqa: E501
 
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)

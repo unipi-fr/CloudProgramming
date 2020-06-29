@@ -309,7 +309,7 @@ public class KMeans {
             job.setReducerClass(KMeansReducer.class);
 
             // Per limitare il numero dei reducer
-            //job.setNumReduceTasks(1);
+            job.setNumReduceTasks(4);
             
             // Definisce i formati key-value del mapper e combiner
             job.setMapOutputKeyClass(Point.class);

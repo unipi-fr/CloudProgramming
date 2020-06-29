@@ -308,8 +308,10 @@ public class KMeans {
             // Carica la sottoclasse del reducer
             job.setReducerClass(KMeansReducer.class);
 
-            // Per limitare il numero dei reducer
-            job.setNumReduceTasks(4);
+            // Il numero consigliato dalla documentazione è:
+            // 1.75 * (nodes * mapred.tasktracker.reduce.tasks.maximum)
+            // 2 è il numero di container generato di default
+            job.setNumReduceTasks(14); //(int) (1.75 * (4.0 * 2.0))
             
             // Definisce i formati key-value del mapper e combiner
             job.setMapOutputKeyClass(Point.class);

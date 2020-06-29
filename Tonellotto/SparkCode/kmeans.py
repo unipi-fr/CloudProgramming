@@ -13,9 +13,8 @@ def createPoint(line):
     point = np.array(lineSplit).astype(np.float)
     return point
 
-def mapFunction(line):
+def mapFunction(point):
     # Prende in ingresso un punto e calcola la distanza tra esso e i vari centroidi, trovando quello più vicino
-    point = createPoint(line)
     minDistance = float("inf")
     nearestCentroidIndex = 0
     index = 0
@@ -84,16 +83,17 @@ if __name__ == "__main__":
     sc.setLogLevel("ERROR")
 
     # Caricamento del file di input nel contesto
-    inputLines = sc.textFile(inputFilePath)
+    # e trasformazione delle linee in "punti"
+    # che essendo riutilizzati nelle iterazioni 
+    # successive vengono resi persistenti
+    points = sc.textFile(inputFilePath).map(createPoint).cache()
 
     # Campionamento casuale dei centroidi, senza rimpiazzo
-    centroidsLines = inputLines.takeSample(withReplacement = False, num = numberOfCentroids, seed = random.randrange(sys.maxsize))
-
-    # Conversione dei centroidi in punti 
-    oldCentroids = [createPoint(line) for line in centroidsLines]
+    oldCentroids = points.takeSample(withReplacement = False, num = numberOfCentroids, seed = random.randrange(sys.maxsize))
 
     # Broadcast in READ-ONLY dei centroid per tutti i task spark
     broadcastCentroids = sc.broadcast(oldCentroids)
+    
     # Margine di movimento dei centroidi dal passo precedente
     centroidsMovementMargin = sys.maxsize
 
@@ -103,9 +103,11 @@ if __name__ == "__main__":
         print("INFO | Starts of iteration " + str(iteration) + " ...")
 
         # Assegnazione punti al centroide più vicino
-        mappedPoints = inputLines.map(mapFunction)
+        mappedPoints = points.map(mapFunction)
 
         # Calcolo delle somme parziali e poi totali dei punti assegnati ai centroidi
+        # IMPORTANTE: viene usata la funzione "combineByKey" invece di "reduceByKey"
+        # in quanto il tipo di input e output sono diversi
         combinedPoints = mappedPoints.combineByKey(createCombiner, mergeValue, mergeCombiner)
 
         # I componenti delle somme totali (x[1][0]) vengono divisi per il numero di punti sommati (x[1][1])

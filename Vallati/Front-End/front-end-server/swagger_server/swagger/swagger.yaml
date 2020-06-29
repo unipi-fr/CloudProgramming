@@ -47,17 +47,14 @@ paths:
         type: "string"
       responses:
         "200":
-          description: "successful operation"
+          description: "It returns a list of all movies with filtered by the optionals\
+            \ parameters"
           schema:
             properties:
               movieList:
                 type: "array"
                 items:
                   $ref: "#/definitions/Movie"
-        "400":
-          description: "Invalid name or year supplied"
-        "404":
-          description: "Movie not found"
       x-swagger-router-controller: "swagger_server.controllers.movies_controller"
     post:
       tags:
@@ -75,14 +72,17 @@ paths:
         description: "Movie data"
         required: true
         schema:
-          $ref: "#/definitions/Movie"
+          $ref: "#/definitions/Movie-Data"
       responses:
         "200":
           description: "Movie added sucefully"
+          schema:
+            properties:
+              id:
+                type: "integer"
+                example: 23
         "400":
-          description: "Invalid input"
-        "409":
-          description: "Movie alredy exists"
+          description: "Invalid fields provided"
       x-swagger-router-controller: "swagger_server.controllers.movies_controller"
     put:
       tags:
@@ -103,13 +103,9 @@ paths:
           $ref: "#/definitions/Movie"
       responses:
         "200":
-          description: "Movie update"
+          description: "Movie added or updated"
         "400":
-          description: "Invalid ID supplied"
-        "404":
-          description: "Movie not found"
-        "405":
-          description: "Validation exception"
+          description: "Invalid fields provided"
       x-swagger-router-controller: "swagger_server.controllers.movies_controller"
   /movies/{movieId}:
     get:
@@ -167,12 +163,14 @@ definitions:
     - "description"
     - "director"
     - "genre"
+    - "id"
     - "name"
     - "year"
     properties:
       id:
         type: "integer"
         format: "int64"
+        example: 1
       name:
         type: "string"
         example: "Avatar"
@@ -201,4 +199,33 @@ definitions:
       description: "A paraplegic Marine dispatched to the moon Pandora on a unique\
         \ mission becomes torn between following his orders and protecting the world\
         \ he feels is his home."
-      id: 0
+      id: 1
+  Movie-Data:
+    type: "object"
+    required:
+    - "description"
+    - "director"
+    - "genre"
+    - "name"
+    - "year"
+    properties:
+      name:
+        type: "string"
+        example: "Avatar"
+      year:
+        type: "integer"
+        format: "int64"
+        example: 2009
+      director:
+        type: "string"
+        example: "James Cameron"
+      genre:
+        type: "string"
+        example: "action"
+      description:
+        type: "string"
+        example: "A paraplegic Marine dispatched to the moon Pandora on a unique mission\
+          \ becomes torn between following his orders and protecting the world he\
+          \ feels is his home."
+    xml:
+      name: "MovieData"

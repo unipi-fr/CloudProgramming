@@ -6,6 +6,7 @@ from django.utils.crypto import get_random_string
 from kazoo.client import KazooClient
 
 from swagger_server.models.movie import Movie  # noqa: E501
+from swagger_server.models.movie_data import MovieData  # noqa: E501
 from swagger_server import util
 
 responseFromCallBack = {}
@@ -67,7 +68,7 @@ def add_movie(body):  # noqa: E501
     :param body: Movie data
     :type body: dict | bytes
 
-    :rtype: None
+    :rtype: Object
     """
     address = zookeeperRetrieve("RabbitMQ/address")
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
@@ -78,7 +79,7 @@ def add_movie(body):  # noqa: E501
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     if connexion.request.is_json:
-        body = connexion.request.get_json()  # noqa: E501
+        body = MovieData.from_dict(connexion.request.get_json())  # noqa: E501
 
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)

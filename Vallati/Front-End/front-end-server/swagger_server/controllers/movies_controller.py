@@ -69,13 +69,12 @@ def add_movie(body):  # noqa: E501
 
     :rtype: None
     """
-    config = getConfig()
     address = zookeeperRetrieve("RabbitMQ/address")
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
-
+    
+    config = getConfig()
     exchange = config["exchange"]
-    #exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     if connexion.request.is_json:
@@ -107,13 +106,12 @@ def delete_movie(movieId):  # noqa: E501
 
     :rtype: None
     """
-    config = getConfig()
     address = zookeeperRetrieve("RabbitMQ/address")
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
 
+    config = getConfig()
     exchange = config["exchange"]
-    #exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
@@ -148,7 +146,8 @@ def get_movie_by_id(movieId):  # noqa: E501
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
 
-    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    config = getConfig()
+    exchange = config["exchange"]
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
@@ -193,8 +192,8 @@ def get_movies(movieName=None, movieYear=None, director=None, genre=None):  # no
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
 
+    config = getConfig()
     exchange = config["exchange"]
-    #exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     filters = {}
@@ -241,7 +240,8 @@ def update_movie(body):  # noqa: E501
     connection = pika.BlockingConnection(pika.ConnectionParameters(address))
     channelToBackEnd = connection.channel()
 
-    exchange = zookeeperRetrieve("RabbitMQ/Exchange_names/front_to_back1")
+    config = getConfig()
+    exchange = config["exchange"]
     channelToBackEnd.exchange_declare(exchange=exchange, exchange_type='direct')
 
     if connexion.request.is_json:
@@ -259,6 +259,6 @@ def update_movie(body):  # noqa: E501
             headers={'queue_name': queue_name}
         ))
 
-    result = get_response_from_backend(connection, queue_name)
+    get_response_from_backend(connection, queue_name)
 
-    return result
+    return None

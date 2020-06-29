@@ -45,7 +45,7 @@ def add_movie(movie):
     mydb.close()
 
     if myresult is not None:
-        return json.dumps(myresult)
+        return '{ "id": '+str(myresult[0])+' }'
     return "{}"
 
 # TESTED
@@ -84,7 +84,7 @@ def update_movie(movie):
     mycursor.close()
     mydb.close()
     
-    return '{ "rowcount" : ' + result + '}'
+    return '{ "row-affected" :  '+str(result)+' }'
 
 # TESTED
 def get_filtered(movie):

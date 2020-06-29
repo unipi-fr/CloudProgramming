@@ -85,10 +85,15 @@ paths:
         description: "Movie data"
         required: true
         schema:
-          $ref: "#/definitions/Movie"
+          $ref: "#/definitions/Movie-Data"
       responses:
         200:
           description: "Movie added sucefully"
+          schema:
+            properties:
+              id:
+                type: integer
+                example: 23
         400:
           description: "Invalid fields provided"
 
@@ -147,6 +152,7 @@ definitions:
   Movie:
     type: "object"
     required:
+    - "id"
     - "name"
     - "year"
     - "director"
@@ -175,3 +181,30 @@ definitions:
         example: "A paraplegic Marine dispatched to the moon Pandora on a unique mission becomes torn between following his orders and protecting the world he feels is his home."
     xml:
       name: "Movie"
+  Movie-Data:
+    type: "object"
+    required:
+    - "name"
+    - "year"
+    - "director"
+    - "genre"
+    - "description"
+    properties:
+      name:
+        type: "string"
+        example: "Avatar"
+      year:
+        type: "integer"
+        format: "int64"
+        example: "2009"
+      director:
+        type: "string"
+        example: "James Cameron"
+      genre:
+        type: "string"
+        example: "action"
+      description:
+        type: "string"
+        example: "A paraplegic Marine dispatched to the moon Pandora on a unique mission becomes torn between following his orders and protecting the world he feels is his home."
+    xml:
+      name: "MovieData"

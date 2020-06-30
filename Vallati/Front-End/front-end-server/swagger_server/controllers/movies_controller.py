@@ -132,8 +132,9 @@ def delete_movie(movieId):  # noqa: E501
         ))
 
     result = get_response_from_backend(connection, queue_name)
-
-    return result
+    if(result["rows-affected"]==0):
+        return json.loads('{ "detail": "The movie was not found on the server. If you entered the URL manually please check your spelling and try again.","status": 404,"title": "Not Found","type": "about:blank"}'), 404
+    return None
 
 
 def get_movie_by_id(movieId):  # noqa: E501

@@ -1,16 +1,16 @@
-GET https://example.com/comments/1 HTTP/1.1
+### Get Movies
+GET http://172.16.3.35:8080/movies HTTP/1.1
 
-###
+### Get Movies with filters
+# movieName - movieYear - director - genre
+GET http://172.16.3.35:8080/movies?movieName=Avatar&movieYear=2009 HTTP/1.1
 
-GET http://172.16.1.121:8080/movies/5 HTTP/1.1
+### get movie by id
+# example id movie 23
+GET http://172.16.3.35:8080/movies/23 HTTP/1.1
 
-###
-
-GET http://172.16.1.121:8080/movies HTTP/1.1
-
-###
-
-POST http://172.16.1.121:8080/movies HTTP/1.1
+### Add movie
+POST http://172.16.3.35:8080/movies HTTP/1.1
 content-type: application/json
 
 {
@@ -21,9 +21,8 @@ content-type: application/json
   "description": "A paraplegic Marine dispatched to the moon Pandora on a unique mission becomes torn between following his orders and protecting the world he feels is his home."
 }
 
-###
-
-PUT http://172.16.1.121:8080/movies HTTP/1.1
+### Update movie
+PUT http://172.16.3.35:8080/movies HTTP/1.1
 content-type: application/json
 
 {
@@ -34,3 +33,6 @@ content-type: application/json
   "genre": "action",
   "description": "A paraplegic Marine dispatched to the moon Pandora on a unique mission becomes torn between following his orders and protecting the world he feels is his home."
 }
+
+### Delete movie
+DELETE http://172.16.3.35:8080/movies/23 HTTP/1.1

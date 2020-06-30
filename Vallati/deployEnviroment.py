@@ -25,9 +25,9 @@ def executeSSHCommand(sshSession,command):
 
 def configureMachine(machineType,machineIP,sshUser,sshPassword,exchange):
     print('\n[INFO] ---------- Configuring {machineType}[{machineIP}]'.format(machineType=machineType,machineIP=machineIP))
-    configForBackEnd = {}
-    configForBackEnd["zookeper-ip"] = config["zookeper-ip"]
-    configForBackEnd["exchange"] = exchange
+    configForMachine = {}
+    configForMachine["zookeper-ip"] = config["zookeper-ip"]
+    configForMachine["exchange"] = exchange
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(machineIP,22,username=sshUser,password=sshPassword,timeout=4)
@@ -41,7 +41,7 @@ def configureMachine(machineType,machineIP,sshUser,sshPassword,exchange):
     executeSSHCommand(ssh,'tar -xzvf {machineType}.tar.gz'.format(machineType=machineType))
     executeSSHCommand(ssh,'rm -f {machineType}.tar.gz'.format(machineType=machineType))
     with open('config-{machineType}.json'.format(machineType=machineType), 'w') as json_file:
-        json.dump(configForBackEnd, json_file)
+        json.dump(configForMachine, json_file)
     sftp.put('config-{machineType}.json'.format(machineType=machineType), '{machineType}/{machineType}-server/config.json'.format(machineType=machineType))
     sftp.close()
     os.remove('config-{machineType}.json'.format(machineType=machineType))
@@ -72,7 +72,7 @@ def configureMachine(machineType,machineIP,sshUser,sshPassword,exchange):
         print('[INFO] skipping building {machineType}-base-server image (alredy exits)'.format(machineType=machineType))
 
     if not checkRemoteImageExists(ssh,'{machineType}-server'.format(machineType=machineType)):
-        print('[INFO] building {machineType}-server image')
+        print('[INFO] building {machineType}-server image'.format(machineType=machineType))
         buildRemoteImage(sshSession=ssh,
                         remotePath='{machineType}'.format(machineType=machineType),
                         nameImage='{machineType}-server'.format(machineType=machineType),

@@ -97,7 +97,7 @@ def get_filtered(movie):
 
     mycursor = mydb.cursor()
     
-    sql = "SELECT * FROM movies WHERE 1=1"
+    sql = "SELECT id,name,year,director,genre,description FROM movies WHERE 1=1"
     val = ()
     if "name" in movie.keys():
         sql = sql + " AND name = %s"
@@ -115,16 +115,27 @@ def get_filtered(movie):
     
     mycursor.execute(sql, val) 
     mydb.commit()
-    movie_list = mycursor.fetchall()
+    movie_sql_list = mycursor.fetchall()
     mycursor.close()
     mydb.close()
 
-    listJson = json.dumps(movie_list) 
+    movie_list = list()
+    result = dict()
+    for movie in movie_sql_list:
+        tmpMovie = dict()
+        tmpMovie["id"] = movie[0]
+        tmpMovie["name"] = movie[1]
+        tmpMovie["year"] = movie[2]
+        tmpMovie["director"] =movie[3]
+        tmpMovie["genre"] = movie[4]
+        tmpMovie["description"] =movie[5]
+        movie_list.append(tmpMovie)
+    result["movieList"] = movie_list
 
-    result = '{ "movieList": ' + listJson + ' }'
+    resultJson = json.dumps(result)
 
-    print(result)
-    return result
+    print(resultJson)
+    return resultJson
         
 # TESTED
 def delete_movie(id):
@@ -143,10 +154,13 @@ def delete_movie(id):
     mycursor.execute(sql, val)
     mydb.commit()
 
-    rowcount = mycursor.rowcount
-    print(rowcount, "record(s) deleted")
+    result = dict()
+    result["rows-affected"] = mycursor.rowcount
+    resultJson = json.dumps(result)
 
-    return '{ "rowcount" : ' + rowcount + '}'
+    print(resultJson)
+
+    return resultJson
     
 # TESTED
 def get_by_id(id):
@@ -158,7 +172,7 @@ def get_by_id(id):
     mydb = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_name)
     mycursor = mydb.cursor()
 
-    sql = "SELECT * FROM movies WHERE id = %s"
+    sql = "SELECT id,name,year,director,genre,description FROM movies WHERE id = %s"
     val = (id, )
 
     mycursor.execute(sql, val)
@@ -167,11 +181,16 @@ def get_by_id(id):
     mycursor.close()
     mydb.close()
 
-    result = "{}"
-    if myresult is not None:
-        result = json.dumps(myresult)
+    tmpMovie = dict()
+    if myresult is not None:  
+        tmpMovie["id"] = myresult[0]
+        tmpMovie["name"] = myresult[1]
+        tmpMovie["year"] = myresult[2]
+        tmpMovie["director"] =myresult[3]
+        tmpMovie["genre"] = myresult[4]
+        tmpMovie["description"] =myresult[5]
 
-    return result
+    return json.dumps(tmpMovie)
 
 # Define a callback invoked every time a message is received
 def callback(ch, method, properties, body):

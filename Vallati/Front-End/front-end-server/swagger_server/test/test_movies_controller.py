@@ -6,6 +6,7 @@ from flask import json
 from six import BytesIO
 
 from swagger_server.models.movie import Movie  # noqa: E501
+from swagger_server.models.movie_data import MovieData  # noqa: E501
 from swagger_server.test import BaseTestCase
 
 
@@ -17,7 +18,7 @@ class TestMoviesController(BaseTestCase):
 
         Add a new movie
         """
-        body = Movie()
+        body = MovieData()
         response = self.client.open(
             '//movies',
             method='POST',

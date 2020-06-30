@@ -45,7 +45,7 @@ def add_movie(movie):
     mydb.close()
 
     if myresult is not None:
-        return json.dumps(myresult)
+        return '{ "id": '+str(myresult[0])+' }'
     return "{}"
 
 # TESTED
@@ -84,7 +84,7 @@ def update_movie(movie):
     mycursor.close()
     mydb.close()
     
-    return '{ "rowcount" : ' + result + '}'
+    return '{ "row-affected" :  '+str(result)+' }'
 
 # TESTED
 def get_filtered(movie):
@@ -97,7 +97,7 @@ def get_filtered(movie):
 
     mycursor = mydb.cursor()
     
-    sql = "SELECT * FROM movies WHERE 1=1"
+    sql = "SELECT id,name,year,director,genre,description FROM movies WHERE 1=1"
     val = ()
     if "name" in movie.keys():
         sql = sql + " AND name = %s"
@@ -115,16 +115,27 @@ def get_filtered(movie):
     
     mycursor.execute(sql, val) 
     mydb.commit()
-    movie_list = mycursor.fetchall()
+    movie_sql_list = mycursor.fetchall()
     mycursor.close()
     mydb.close()
 
-    listJson = json.dumps(movie_list) 
+    movie_list = list()
+    result = dict()
+    for movie in movie_sql_list:
+        tmpMovie = dict()
+        tmpMovie["id"] = movie[0]
+        tmpMovie["name"] = movie[1]
+        tmpMovie["year"] = movie[2]
+        tmpMovie["director"] =movie[3]
+        tmpMovie["genre"] = movie[4]
+        tmpMovie["description"] =movie[5]
+        movie_list.append(tmpMovie)
+    result["movieList"] = movie_list
 
-    result = '{ "movieList": ' + listJson + ' }'
+    resultJson = json.dumps(result)
 
-    print(result)
-    return result
+    print(resultJson)
+    return resultJson
         
 # TESTED
 def delete_movie(id):
@@ -143,10 +154,13 @@ def delete_movie(id):
     mycursor.execute(sql, val)
     mydb.commit()
 
-    rowcount = mycursor.rowcount
-    print(rowcount, "record(s) deleted")
+    result = dict()
+    result["rows-affected"] = mycursor.rowcount
+    resultJson = json.dumps(result)
 
-    return '{ "rowcount" : ' + rowcount + '}'
+    print(resultJson)
+
+    return resultJson
     
 # TESTED
 def get_by_id(id):
@@ -158,7 +172,7 @@ def get_by_id(id):
     mydb = MySQLdb.connect(host=db_host, user=db_user, passwd=db_pass, db=db_name)
     mycursor = mydb.cursor()
 
-    sql = "SELECT * FROM movies WHERE id = %s"
+    sql = "SELECT id,name,year,director,genre,description FROM movies WHERE id = %s"
     val = (id, )
 
     mycursor.execute(sql, val)
@@ -167,36 +181,40 @@ def get_by_id(id):
     mycursor.close()
     mydb.close()
 
-    result = "{}"
-    if myresult is not None:
-        result = json.dumps(myresult)
+    tmpMovie = dict()
+    if myresult is not None:  
+        tmpMovie["id"] = myresult[0]
+        tmpMovie["name"] = myresult[1]
+        tmpMovie["year"] = myresult[2]
+        tmpMovie["director"] =myresult[3]
+        tmpMovie["genre"] = myresult[4]
+        tmpMovie["description"] =myresult[5]
 
-    return result
+    return json.dumps(tmpMovie)
 
 # Define a callback invoked every time a message is received
 def callback(ch, method, properties, body):
-    print(" [x] %r:%r" % (method.routing_key, body))
-    response = ""
+    print(" [x] %r" % (body))
+    response = "{}"
     queue_name = properties.headers["queue_name"]
 
-    r_k_add = zookeeperRetrieve("Utils/Routing_keys/addMovie")
-    r_k_update = zookeeperRetrieve("Utils/Routing_keys/updateMovie")
-    r_k_get_f = zookeeperRetrieve("Utils/Routing_keys/getFilteredMovies")
-    r_k_delete = zookeeperRetrieve("Utils/Routing_keys/deleteMovie")
-    r_k_get_by_id = zookeeperRetrieve("Utils/Routing_keys/getById")
+    method_to_do = properties.headers["method"]
+
+    print(method_to_do)
+
     rabbitMQ_address = zookeeperRetrieve("RabbitMQ/address")
     config = getConfig()
     exchange = config["exchange"]
 
-    if method.routing_key == r_k_add:
+    if method_to_do == "addMovie":
         response = add_movie(json.loads(body))
-    elif method.routing_key == r_k_update:
+    elif method_to_do == "updateMovie":
         response = update_movie(json.loads(body))
-    elif method.routing_key == r_k_get_f:
+    elif method_to_do == "getFilteredMovies":
         response = get_filtered(json.loads(body))
-    elif method.routing_key == r_k_delete:
+    elif method_to_do == "deleteMovie":
         response = delete_movie(int(body))
-    elif method.routing_key == r_k_get_by_id:
+    elif method_to_do == "getById":
         response = get_by_id(int(body))
     else:
         print("Unknown method")
@@ -228,13 +246,10 @@ if __name__ == '__main__':
     r_k_delete = zookeeperRetrieve("Utils/Routing_keys/deleteMovie")
     r_k_get_by_id = zookeeperRetrieve("Utils/Routing_keys/getById")
 
+    routing_key = "front_to_back"
 
     # Bind the queue to one or more keys/exchanges (it can be done at runtime)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_add)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_update)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_get_f)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_delete)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_get_by_id)
+    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=routing_key)
         
     channel.basic_consume(
         queue=queue_name, on_message_callback=callback, auto_ack=True)

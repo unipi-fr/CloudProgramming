@@ -11,6 +11,8 @@ from swagger_server import util
 
 responseFromCallBack = {}
 
+routing_key = "front_to_back"
+
 def log(message):
     with open("front-end.log", "a") as myfile:
         myfile.write(message+"\n")
@@ -84,13 +86,14 @@ def add_movie(body):  # noqa: E501
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)
 
-    routing_key = zookeeperRetrieve("Utils/Routing_keys/addMovie")
+    method_name = "addMovie"
+
     channelToBackEnd.basic_publish(
         exchange=exchange, 
         routing_key=routing_key, 
         body=json.dumps(body), 
         properties=pika.BasicProperties(
-            headers={'queue_name': queue_name}
+            headers={'queue_name': queue_name, 'method': method_name}
         ))
 
     result = get_response_from_backend(connection, queue_name)
@@ -118,13 +121,14 @@ def delete_movie(movieId):  # noqa: E501
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)
 
-    routing_key = zookeeperRetrieve("Utils/Routing_keys/deleteMovie")
+    method_name = "deleteMovie"
+
     channelToBackEnd.basic_publish(
         exchange=exchange, 
         routing_key=routing_key, 
         body=str(movieId), 
         properties=pika.BasicProperties(
-            headers={'queue_name': queue_name}
+            headers={'queue_name': queue_name, 'method': method_name}
         ))
 
     result = get_response_from_backend(connection, queue_name)
@@ -154,13 +158,14 @@ def get_movie_by_id(movieId):  # noqa: E501
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)
 
-    routing_key = zookeeperRetrieve("Utils/Routing_keys/getById")
+    method_name = "getById"
+
     channelToBackEnd.basic_publish(
         exchange=exchange, 
         routing_key=routing_key, 
         body=str(movieId), 
         properties=pika.BasicProperties(
-            headers={'queue_name': queue_name}
+            headers={'queue_name': queue_name, 'method': method_name}
         ))
 
     result = get_response_from_backend(connection, queue_name)
@@ -213,13 +218,14 @@ def get_movies(movieName=None, movieYear=None, director=None, genre=None):  # no
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)
 
-    routing_key = zookeeperRetrieve("Utils/Routing_keys/getFilteredMovies")
+    method_name = "getFilteredMovies"
+
     channelToBackEnd.basic_publish(
         exchange=exchange, 
         routing_key=routing_key, 
         body = jsonString, 
         properties=pika.BasicProperties(
-            headers={'queue_name': queue_name}
+            headers={'queue_name': queue_name, 'method': method_name}
         ))
 
     result = get_response_from_backend(connection, queue_name)
@@ -251,13 +257,14 @@ def update_movie(body):  # noqa: E501
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)
 
-    routing_key = zookeeperRetrieve("Utils/Routing_keys/updateMovie")
+    routing_key = "updateMovie"
+    
     channelToBackEnd.basic_publish(
         exchange=exchange, 
         routing_key=routing_key, 
         body=json.dumps(body), 
         properties=pika.BasicProperties(
-            headers={'queue_name': queue_name}
+            headers={'queue_name': queue_name, 'method': method_name}
         ))
 
     get_response_from_backend(connection, queue_name)

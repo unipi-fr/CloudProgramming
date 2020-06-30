@@ -175,28 +175,27 @@ def get_by_id(id):
 
 # Define a callback invoked every time a message is received
 def callback(ch, method, properties, body):
-    print(" [x] %r:%r" % (method.routing_key, body))
-    response = ""
+    print(" [x] %r" % (body))
+    response = "{}"
     queue_name = properties.headers["queue_name"]
 
-    r_k_add = zookeeperRetrieve("Utils/Routing_keys/addMovie")
-    r_k_update = zookeeperRetrieve("Utils/Routing_keys/updateMovie")
-    r_k_get_f = zookeeperRetrieve("Utils/Routing_keys/getFilteredMovies")
-    r_k_delete = zookeeperRetrieve("Utils/Routing_keys/deleteMovie")
-    r_k_get_by_id = zookeeperRetrieve("Utils/Routing_keys/getById")
+    method_to_do = properties.headers["method"]
+
+    print(method_to_do)
+
     rabbitMQ_address = zookeeperRetrieve("RabbitMQ/address")
     config = getConfig()
     exchange = config["exchange"]
 
-    if method.routing_key == r_k_add:
+    if method_to_do == "addMovie":
         response = add_movie(json.loads(body))
-    elif method.routing_key == r_k_update:
+    elif method_to_do == "updateMovie":
         response = update_movie(json.loads(body))
-    elif method.routing_key == r_k_get_f:
+    elif method_to_do == "getFilteredMovies":
         response = get_filtered(json.loads(body))
-    elif method.routing_key == r_k_delete:
+    elif method_to_do == "deleteMovie":
         response = delete_movie(int(body))
-    elif method.routing_key == r_k_get_by_id:
+    elif method_to_do == "getById":
         response = get_by_id(int(body))
     else:
         print("Unknown method")
@@ -228,13 +227,10 @@ if __name__ == '__main__':
     r_k_delete = zookeeperRetrieve("Utils/Routing_keys/deleteMovie")
     r_k_get_by_id = zookeeperRetrieve("Utils/Routing_keys/getById")
 
+    routing_key = "front_to_back"
 
     # Bind the queue to one or more keys/exchanges (it can be done at runtime)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_add)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_update)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_get_f)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_delete)
-    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=r_k_get_by_id)
+    channel.queue_bind(exchange=exchange, queue=queue_name, routing_key=routing_key)
         
     channel.basic_consume(
         queue=queue_name, on_message_callback=callback, auto_ack=True)

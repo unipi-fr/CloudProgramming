@@ -257,7 +257,7 @@ def update_movie(body):  # noqa: E501
     numBytes = int(zookeeperRetrieve("Utils/string_dim"))
     queue_name = get_random_string(numBytes)
 
-    routing_key = "updateMovie"
+    method_name = "updateMovie"
     
     channelToBackEnd.basic_publish(
         exchange=exchange, 

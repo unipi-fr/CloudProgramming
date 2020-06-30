@@ -2,6 +2,10 @@ GET https://example.com/comments/1 HTTP/1.1
 
 ###
 
+GET http://172.16.1.121:8080/movies/5 HTTP/1.1
+
+###
+
 GET http://172.16.1.121:8080/movies HTTP/1.1
 
 ###

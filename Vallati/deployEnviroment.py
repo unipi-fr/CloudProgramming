@@ -70,6 +70,7 @@ def configureMachine(machineType,machineIP,sshUser,sshPassword,exchange):
                         dockerfile='only-{machineType}-base-server.dockerfile'.format(machineType=machineType))
     else:
         print('[INFO] skipping building {machineType}-base-server image (alredy exits)'.format(machineType=machineType))
+
     if not checkRemoteImageExists(ssh,'{machineType}-server'.format(machineType=machineType)):
         print('[INFO] building {machineType}-server image')
         buildRemoteImage(sshSession=ssh,
@@ -78,6 +79,7 @@ def configureMachine(machineType,machineIP,sshUser,sshPassword,exchange):
                         dockerfile='only-{machineType}-server.dockerfile'.format(machineType=machineType))
     else:
         print('[INFO] skipping building {machineType}-server image (alredy exits)'.format(machineType=machineType))
+        
     if not checkRemoteContainerExists(ssh,'{machineType}-server'.format(machineType=machineType)):
         print('[INFO] depploing {machineType}-server'.format(machineType=machineType))
         executeSSHCommand(ssh,'docker run -d --hostname my-{machineType} --name {machineType}-server -p 8080:8080 {machineType}-server'.format(machineType=machineType))
@@ -106,8 +108,8 @@ if __name__ == '__main__':
     with open('config.json','r') as f:
         config = json.load(f)
         print('loading configuration:\n{config}'.format(config=json.dumps(config, indent=4, sort_keys=True)))
+    
     tarDir('front-end','front-end')
-        
     for machine in config['front-end-machines']:
         configureMachine('front-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
     os.remove('front-end.tar.gz')

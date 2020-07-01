@@ -5,21 +5,6 @@ import json
 
 config = {}
 
-if __name__ == '__main__':
-    with open('config.json','r') as f:
-        config = json.load(f)
-        print('loading configuration:\n{config}'.format(config=json.dumps(config, indent=4, sort_keys=True)))
-    
-    tarDir('front-end','front-end')
-    for machine in config['front-end-machines']:
-        configureMachine('front-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
-    os.remove('front-end.tar.gz')
-        
-    tarDir('back-end','back-end')
-    for machine in config['back-end-machines']:
-       configureMachine('back-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
-    os.remove('back-end.tar.gz')
-
 def configureMachine(machineType,machineIP,sshUser,sshPassword,exchange):
     print('\n[INFO] ---------- Configuring {machineType}[{machineIP}]'.format(machineType=machineType,machineIP=machineIP))
     configForMachine = {}
@@ -111,4 +96,17 @@ def checkRemoteImageExists(sshSession,imageName):
     ssh_stdin, ssh_stdout, ssh_stderr = sshSession.exec_command('docker image ls -a | grep -w "{imageName}"'.format(imageName=imageName))
     return  len(ssh_stdout.readlines()) > 0
     
+if __name__ == '__main__':
+    with open('config.json','r') as f:
+        config = json.load(f)
+        print('loading configuration:\n{config}'.format(config=json.dumps(config, indent=4, sort_keys=True)))
     
+    tarDir('front-end','front-end')
+    for machine in config['front-end-machines']:
+        configureMachine('front-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
+    os.remove('front-end.tar.gz')
+        
+    tarDir('back-end','back-end')
+    for machine in config['back-end-machines']:
+       configureMachine('back-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
+    os.remove('back-end.tar.gz')

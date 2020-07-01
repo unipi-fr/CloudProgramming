@@ -22,7 +22,6 @@ def zookeeperRetrieve(path):
 # TESTED
 def add_movie(movie):
 
-
     db_host = zookeeperRetrieve("/MySql/address")
     db_user = zookeeperRetrieve("/MySql/user")
     db_pass = zookeeperRetrieve("/MySql/pass")
@@ -73,8 +72,8 @@ def update_movie(movie):
         val = (movie["name"], movie["description"], movie["director"], movie["year"], movie["genre"], movie["id"])
     else:
         #otherwise I add it in the DB
-        sql = "INSERT INTO movies (name, description, director, year, genre) VALUES (%s, %s, %s, %s, %s)" 
-        val = (movie["name"], movie["description"], movie["director"], movie["year"], movie["genre"])
+        sql = "INSERT INTO movies (id, name, description, director, year, genre) VALUES (%s, %s, %s, %s, %s, %s)" 
+        val = (movie["id"], movie["name"], movie["description"], movie["director"], movie["year"], movie["genre"])
     
     mycursor.execute(sql, val)
     mydb.commit()
@@ -224,7 +223,6 @@ def callback(ch, method, properties, body):
 
     channel.basic_publish(exchange=exchange, routing_key=queue_name, body=response)
     
-# SAREBBE MEGLIO UNA CONNESSIONE GLOBALE ????
 if __name__ == '__main__':
     # Connect to RabbitMQ
     rabbitMQ_address = zookeeperRetrieve("RabbitMQ/address")
@@ -239,12 +237,6 @@ if __name__ == '__main__':
     # I let the system to create the queue name
     result = channel.queue_declare(queue='', exclusive=True)
     queue_name = result.method.queue
-
-    r_k_add = zookeeperRetrieve("Utils/Routing_keys/addMovie")
-    r_k_update = zookeeperRetrieve("Utils/Routing_keys/updateMovie")
-    r_k_get_f = zookeeperRetrieve("Utils/Routing_keys/getFilteredMovies")
-    r_k_delete = zookeeperRetrieve("Utils/Routing_keys/deleteMovie")
-    r_k_get_by_id = zookeeperRetrieve("Utils/Routing_keys/getById")
 
     routing_key = "front_to_back"
 

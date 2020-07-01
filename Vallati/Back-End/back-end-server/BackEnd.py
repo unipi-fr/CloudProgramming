@@ -39,7 +39,6 @@ def add_movie(movie):
     myresult = mycursor.fetchone()
 
     mydb.commit()
-    #result = mycursor.rowcount
     mycursor.close()
     mydb.close()
 

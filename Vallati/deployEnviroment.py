@@ -1,27 +1,24 @@
 import paramiko
 import os
-import zipfile
 import tarfile
 import json
 
 config = {}
 
-def zipDir(path, filename):
-    zipf = zipfile.ZipFile(filename+'.zip', 'w', zipfile.ZIP_DEFLATED)
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            zipf.write(os.path.join(root, file))
-    zipf.close()
+if __name__ == '__main__':
+    with open('config.json','r') as f:
+        config = json.load(f)
+        print('loading configuration:\n{config}'.format(config=json.dumps(config, indent=4, sort_keys=True)))
     
-def tarDir(path,tarName):
-    tar = tarfile.open(tarName+".tar.gz", "w:gz")
-    tar.add(path, arcname=tarName)
-    tar.close()
-
-def executeSSHCommand(sshSession,command):
-    ssh_stdin, ssh_stdout, ssh_stderr = sshSession.exec_command(command)
-    print(ssh_stdout.read().decode('ascii').strip("\n"))
-    print(ssh_stderr.read().decode('ascii').strip("\n"))
+    tarDir('front-end','front-end')
+    for machine in config['front-end-machines']:
+        configureMachine('front-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
+    os.remove('front-end.tar.gz')
+        
+    tarDir('back-end','back-end')
+    for machine in config['back-end-machines']:
+       configureMachine('back-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
+    os.remove('back-end.tar.gz')
 
 def configureMachine(machineType,machineIP,sshUser,sshPassword,exchange):
     print('\n[INFO] ---------- Configuring {machineType}[{machineIP}]'.format(machineType=machineType,machineIP=machineIP))
@@ -85,6 +82,16 @@ def configureMachine(machineType,machineIP,sshUser,sshPassword,exchange):
         executeSSHCommand(ssh,'docker run -d --hostname my-{machineType} --name {machineType}-server -p 8080:8080 {machineType}-server'.format(machineType=machineType))
     else:
         print('[INFO] skipping deploy {machineType}-server container (alredy exits)'.format(machineType=machineType))
+    
+def tarDir(path,tarName):
+    tar = tarfile.open(tarName+".tar.gz", "w:gz")
+    tar.add(path, arcname=tarName)
+    tar.close()
+
+def executeSSHCommand(sshSession,command):
+    ssh_stdin, ssh_stdout, ssh_stderr = sshSession.exec_command(command)
+    print(ssh_stdout.read().decode('ascii').strip("\n"))
+    print(ssh_stderr.read().decode('ascii').strip("\n"))
 
 def buildRemoteImage(sshSession,remotePath,nameImage,dockerfile):
     executeSSHCommand(sshSession,'cd {remotePath}; docker build -t {nameImage} -f {dockerfile} .'
@@ -97,26 +104,11 @@ def removeRemoteImage(sshSession,imageName):
     executeSSHCommand(sshSession,'docker image rm -f {imageName}'.format(imageName=imageName))
 
 def checkRemoteContainerExists(sshSession,containerName):
-    ssh_stdin, ssh_stdout, ssh_stderr = sshSession.exec_command('docker container ls | grep -w "{containerName}"'.format(containerName=containerName))
+    ssh_stdin, ssh_stdout, ssh_stderr = sshSession.exec_command('docker container ls -a | grep -w "{containerName}"'.format(containerName=containerName))
     return len(ssh_stdout.readlines()) > 0
 
 def checkRemoteImageExists(sshSession,imageName):
-    ssh_stdin, ssh_stdout, ssh_stderr = sshSession.exec_command('docker image ls | grep -w "{imageName}"'.format(imageName=imageName))
+    ssh_stdin, ssh_stdout, ssh_stderr = sshSession.exec_command('docker image ls -a | grep -w "{imageName}"'.format(imageName=imageName))
     return  len(ssh_stdout.readlines()) > 0
-
-if __name__ == '__main__':
-    with open('config.json','r') as f:
-        config = json.load(f)
-        print('loading configuration:\n{config}'.format(config=json.dumps(config, indent=4, sort_keys=True)))
-    
-    tarDir('front-end','front-end')
-    for machine in config['front-end-machines']:
-        configureMachine('front-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
-    os.remove('front-end.tar.gz')
-        
-    tarDir('back-end','back-end')
-    for machine in config['back-end-machines']:
-       configureMachine('back-end',machine['ip'],machine['ssh-user'],machine['ssh-password'],machine['exchange'])
-    os.remove('back-end.tar.gz')
     
     

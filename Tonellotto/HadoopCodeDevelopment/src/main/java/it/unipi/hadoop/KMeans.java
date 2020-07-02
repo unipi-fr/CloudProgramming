@@ -212,7 +212,7 @@ public class KMeans {
         int d = Integer.parseInt(otherArgs[1]);
 
         // Criterio di stop
-        double stopCriteria = Double.valueOf(otherArgs[3]) * k;
+        double stopCriteria = Double.valueOf(otherArgs[3]);
         // Numero massimo di iterazioni in caso di convergenza lenta
         int maxIterations = Integer.parseInt(otherArgs[4]); //per sicurezza
 
@@ -311,7 +311,9 @@ public class KMeans {
             // Il numero consigliato dalla documentazione è:
             // 1.75 * (nodes * mapred.tasktracker.reduce.tasks.maximum)
             // 2 è il numero di container generato di default
-            job.setNumReduceTasks(14); //(int) (1.75 * (4.0 * 2.0))
+            // 1.75 * (4.0 * 2.0) = 14, ma k è sempre minore
+            // perciò si è deciso di usare direttamente k
+            job.setNumReduceTasks(k); 
             
             // Definisce i formati key-value del mapper e combiner
             job.setMapOutputKeyClass(Point.class);
